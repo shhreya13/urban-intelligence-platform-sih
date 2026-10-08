@@ -1,0 +1,63 @@
+# Person 3 configuration
+roboflow:
+  workspace: "human-v2"
+  project: "human-dataset-v2"
+  version: 6
+  format: "yolov8"
+
+training:
+  base_model: "yolov8n.pt"
+  epochs: 50
+  imgsz: 640
+  batch: 8
+  project: "runs/detect"
+  name: "person3_pedestrian"
+
+runtime:
+  confidence: 0.35
+  iou: 0.50
+  imgsz: 640
+  tracker: "botsort.yaml"
+  history_seconds: 1.5
+  event_cooldown_seconds: 1.0
+
+# Normalized coordinates (x,y), 0..1.
+# These are starter values for the supplied vertical road video.
+# Tune them for your exact camera.
+zones:
+  road_zone:
+    - [0.02, 0.36]
+    - [0.98, 0.36]
+    - [0.99, 0.93]
+    - [0.01, 0.93]
+
+  crossing_zone:
+    - [0.00, 0.50]
+    - [1.00, 0.50]
+    - [1.00, 0.84]
+    - [0.00, 0.84]
+
+risk:
+  thresholds:
+    low_max: 20
+    medium_max: 45
+    high_max: 70
+
+  # Weights are deliberately simple and explainable.
+  child_multiplier: 1.20
+  crossing_bonus: 15
+  road_bonus: 10
+  approach_bonus: 25
+  close_bonus: 25
+
+  # Pixel-distance thresholds are relative to a 640px inference frame.
+  close_distance_px: 70
+  dangerous_distance_px: 40
+
+  # Closing speed is pixels/frame after smoothing.
+  approach_threshold_px_per_frame: 0.8
+
+  # Minimum vehicle speed proxy before adding speed risk.
+  vehicle_speed_px_per_frame: 1.0
+
+  max_pair_distance_px: 260

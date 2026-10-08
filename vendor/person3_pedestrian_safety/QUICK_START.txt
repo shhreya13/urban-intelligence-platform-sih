@@ -1,0 +1,23 @@
+PERSON 3 — QUICK START
+
+1) Open a terminal in this folder.
+2) Create a Python environment and install requirements:
+   python -m venv .venv
+   .venv\Scripts\activate
+   pip install -r requirements.txt
+
+3) Get a Roboflow API key, then:
+   python scripts\download_roboflow.py
+   python scripts\normalize_dataset.py
+
+4) Train:
+   python train.py
+
+5) Test on your supplied video:
+   python run_safety.py --source "WhatsApp Video 2026-09-08 at 10.15.09 PM.mp4" --ped-model "runs/detect/person3_pedestrian/weights/best.pt" --vehicle-model "yolov8n.pt"
+
+IMPORTANT:
+- The supplied video is a TEST video, not the training dataset.
+- For the final team system, replace yolov8n.pt with Person 2's vehicle model.
+- Tune road_zone and crossing_zone in config.yaml for your camera.
+- Pixel distance is not meters. Camera calibration is needed for real-world distance.

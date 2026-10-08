@@ -1,0 +1,46 @@
+# =====================================================================
+# AI Urban Intelligence Platform -- integrated dependency set
+# ---------------------------------------------------------------------
+# This is the union of the five team requirement files
+# (vendor/*/requirements.txt), de-duplicated and pinned to a floor that
+# is known to work together on Windows and Linux, CPU or CUDA.
+#
+#   Windows / Linux CPU :  pip install -r requirements.txt
+#   NVIDIA GPU          :  install torch from https://pytorch.org first,
+#                          then run the line above.
+#
+# Nothing here is Jetson-specific.  That is a later phase.
+# =====================================================================
+
+# ---- shared perception (Person 1, 2, 3, 4, 5 all sit on this) --------
+ultralytics>=8.3.0           # YOLO11 + BoT-SORT tracker
+torch>=2.2.0                 # pulled in by ultralytics; pin explicitly for GPU builds
+torchvision>=0.17.0
+
+# ---- imaging / numerics ----------------------------------------------
+opencv-python>=4.8.0         # use opencv-python-headless on a server without a display
+numpy>=1.24.0
+scipy>=1.10.0
+pandas>=2.0.0                # Person 2's analytics exports
+lap>=0.4.0                   # assignment solver required by BoT-SORT
+
+# ---- Person 5, ANPR ---------------------------------------------------
+easyocr>=1.7.0               # the OCR engine already in use -- do not swap
+Pillow>=10.0.0
+
+# ---- configuration ----------------------------------------------------
+PyYAML>=6.0
+
+# ---- backend + dashboard ---------------------------------------------
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.9
+
+# ---- tests ------------------------------------------------------------
+pytest>=7.4.0
+
+# ---------------------------------------------------------------------
+# Deliberately NOT required:
+#   roboflow          -- dataset download only, used at training time
+#   tensorrt / onnx   -- Jetson phase, not this one
+# ---------------------------------------------------------------------

@@ -1,0 +1,2478 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Urban Intelligence — Command Center</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* ==================================================================
+   AI URBAN INTELLIGENCE PLATFORM -- operations dashboard
+   Single file, no build step.  Every number on this page comes from
+   the backend; nothing is generated client-side for decoration.
+   ================================================================== */
+:root{
+  --bg:#F5F7FA;
+  --panel:#FFFFFF;
+  --panel-2:#F1F4F8;
+  --panel-3:#E6EBF2;
+  --line:#DDE3EC;
+  --line-soft:#E8ECF2;
+  --ink:#1A2233;
+  --ink-2:#576375;
+  --ink-3:#8592A6;
+  --accent:#2F6FED;
+  --accent-dim:#E8F0FE;
+  --info:#5E6B7D;
+  --low:#188556;
+  --medium:#B4740A;
+  --high:#D2622A;
+  --critical:#D93A3F;
+  --ok:#188556;
+  --radius:6px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Consolas,"Liberation Mono",Menlo,monospace;
+  --sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--sans);
+  font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#C7D0DD;border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------------- shell ---------------- */
+.shell{display:grid;grid-template-columns:212px 1fr;height:100vh}
+aside{
+  background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;overflow-y:auto;
+}
+.brand{padding:16px 16px 14px;border-bottom:1px solid var(--line)}
+.brand h1{font-size:13px;font-weight:650;letter-spacing:.01em;line-height:1.25}
+.brand span{display:block;font-size:10px;color:var(--ink-3);letter-spacing:.11em;text-transform:uppercase;margin-top:4px}
+nav{padding:10px 8px;display:flex;flex-direction:column;gap:1px;flex:1}
+.nav-group{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);padding:14px 8px 6px}
+nav a{
+  display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:5px;
+  color:var(--ink-2);font-size:13px;font-weight:450;
+}
+nav a:hover{background:var(--panel-2);color:var(--ink)}
+nav a.on{background:var(--accent-dim);color:#1449B0;font-weight:550}
+nav a .ico{width:15px;text-align:center;opacity:.85;font-size:12px}
+nav a .pill{
+  margin-left:auto;font-family:var(--mono);font-size:10px;
+  background:var(--panel-3);color:var(--ink-2);padding:1px 5px;border-radius:9px;
+}
+nav a.on .pill{background:#D7E6FF;color:#1449B0}
+nav a .pill.alert{background:#FBE1E1;color:#B3242E}
+.side-foot{padding:12px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-3)}
+
+main{display:flex;flex-direction:column;overflow:hidden}
+header.top{
+  display:flex;align-items:center;gap:14px;padding:0 18px;height:50px;
+  border-bottom:1px solid var(--line);background:var(--panel);flex:none;
+}
+header.top h2{font-size:14.5px;font-weight:600}
+header.top .sub{font-size:11.5px;color:var(--ink-3)}
+.spacer{flex:1}
+.status{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink-2)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.dot.bad{background:var(--critical)}
+.btn{
+  border:1px solid var(--line);background:var(--panel-2);padding:5px 11px;
+  border-radius:5px;font-size:12px;color:var(--ink-2);
+}
+.btn:hover{border-color:#B7C1D1;color:var(--ink)}
+.btn.on{background:var(--accent-dim);border-color:#9CC0FF;color:#1449B0}
+.view{padding:18px;overflow-y:auto;flex:1}
+
+/* ---------------- primitives ---------------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
+.card > h3{
+  font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
+  padding:11px 14px;border-bottom:1px solid var(--line-soft);font-weight:600;
+  display:flex;align-items:center;gap:8px;
+}
+.card > h3 .right{margin-left:auto;font-size:10.5px;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+.card .body{padding:14px}
+.grid{display:grid;gap:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px;position:relative;overflow:hidden}
+.kpi .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.kpi .v{font-size:27px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:5px;line-height:1.05}
+.kpi .n{font-size:11px;color:var(--ink-3);margin-top:3px}
+.kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--line)}
+.kpi.crit::after{background:var(--critical)}
+.kpi.high::after{background:var(--high)}
+.kpi.med::after{background:var(--medium)}
+.kpi.ok::after{background:var(--low)}
+.kpi.acc::after{background:var(--accent)}
+
+/* badges */
+.sev{
+  display:inline-block;font-size:10px;font-weight:650;letter-spacing:.06em;
+  padding:2px 6px;border-radius:3px;border:1px solid currentColor;white-space:nowrap;
+}
+.sev.INFO{color:var(--info)} .sev.LOW{color:var(--low)} .sev.MEDIUM{color:var(--medium)}
+.sev.HIGH{color:var(--high)} .sev.CRITICAL{color:var(--critical)}
+.tag{
+  display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:3px;
+  background:var(--panel-3);color:var(--ink-2);white-space:nowrap;
+}
+.tag.state{font-family:var(--mono);font-size:10px;letter-spacing:.02em}
+.tag.confirmed{background:#FBE1E1;color:#B3242E}
+.tag.suspected{background:#FBF0D9;color:#8A6212}
+.tag.synthetic{background:#E3F1FF;color:#1668A8;border:1px solid #A9D4F5;font-weight:650;letter-spacing:.05em}
+.synthbanner{
+  background:#EAF3FF;border:1px solid #BBDCFF;border-left:3px solid var(--accent);
+  color:#245A9E;padding:10px 14px;border-radius:6px;margin-bottom:12px;font-size:12.5px;
+}
+.synthbanner b{color:#1668A8}
+.mono{font-family:var(--mono);font-size:12px}
+.id{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);background:var(--panel-3);padding:1px 6px;border-radius:3px}
+
+/* tables */
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{
+  text-align:left;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--line);
+  background:var(--panel-2);position:sticky;top:0;white-space:nowrap;z-index:1;
+}
+td{padding:8px 12px;border-bottom:1px solid var(--line-soft);vertical-align:middle;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tbody tr.clickable{cursor:pointer}
+tbody tr.clickable:hover{background:var(--panel-2)}
+td.num{font-variant-numeric:tabular-nums;text-align:right}
+.thumb{width:54px;height:34px;object-fit:cover;border-radius:3px;border:1px solid var(--line);background:var(--panel-3);display:block}
+
+/* states */
+.empty,.loading,.errorbox{
+  padding:34px 20px;text-align:center;color:var(--ink-3);font-size:12.5px;
+}
+.empty strong{display:block;color:var(--ink-2);font-size:13.5px;margin-bottom:5px;font-weight:550}
+.errorbox{color:#C6323B}
+.skel{height:11px;border-radius:3px;background:linear-gradient(90deg,#EDF1F6,#E2E8F0,#EDF1F6);
+  background-size:200% 100%;animation:sh 1.3s infinite}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skelrow{display:flex;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line-soft)}
+.skelrow .skel:nth-child(1){width:16%} .skelrow .skel:nth-child(2){width:22%}
+.skelrow .skel:nth-child(3){width:14%} .skelrow .skel:nth-child(4){width:30%}
+
+/* map */
+#map,#mapFull{width:100%;background:var(--panel-2);border-radius:var(--radius)}
+#map{height:330px} #mapFull{height:calc(100vh - 178px)}
+.leaflet-container{background:#E9EEF5}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel-2);color:var(--ink);border-radius:5px}
+.leaflet-popup-content{margin:10px 12px;font-size:12px;font-family:var(--sans)}
+.leaflet-popup-content b{color:var(--ink)}
+.mapfallback{padding:12px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2);padding:10px 14px;border-top:1px solid var(--line-soft)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+/* charts */
+svg.chart{display:block;width:100%;height:auto;overflow:visible}
+.chart text{fill:var(--ink-3);font-size:9.5px;font-family:var(--sans)}
+.chart .grid line{stroke:var(--line-soft)}
+.bar{fill:var(--accent)}
+.barlabel{fill:var(--ink-2);font-size:10px}
+
+/* incident detail */
+.detail{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:12px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:12.5px}
+.kv dt{color:var(--ink-3);white-space:nowrap}
+.kv dd{color:var(--ink);word-break:break-word}
+.timeline{position:relative;padding-left:20px}
+.timeline::before{content:"";position:absolute;left:5px;top:5px;bottom:6px;width:1px;background:var(--line)}
+.tstep{position:relative;padding:0 0 13px}
+.tstep::before{
+  content:"";position:absolute;left:-19px;top:5px;width:9px;height:9px;border-radius:50%;
+  background:var(--panel);border:2px solid var(--ink-3);
+}
+.tstep.hit::before{border-color:var(--critical);background:var(--critical)}
+.tstep.leave::before{border-color:var(--high)}
+.tstep .st{font-family:var(--mono);font-size:11px;color:var(--ink);letter-spacing:.02em}
+.tstep .tm{font-family:var(--mono);font-size:10.5px;color:var(--accent);margin-right:8px}
+.tstep .nt{font-size:11.5px;color:var(--ink-3);margin-top:2px}
+.evidence-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:9px}
+.evidence-strip figure{border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--panel-2)}
+.evidence-strip img,.evidence-strip video{width:100%;height:82px;object-fit:cover;display:block;background:#E9EEF5}
+.evidence-strip figcaption{font-size:10px;color:var(--ink-3);padding:5px 7px;text-transform:uppercase;letter-spacing:.07em}
+
+/* live page */
+.live{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px}
+.live video{width:100%;display:block;border-radius:var(--radius);background:#000}
+.eventfeed{max-height:calc(100vh - 210px);overflow-y:auto}
+.feeditem{padding:9px 13px;border-bottom:1px solid var(--line-soft);display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.feeditem:hover{background:var(--panel-2)}
+.feeditem.active{background:var(--accent-dim)}
+.feeditem .t{font-family:var(--mono);font-size:10.5px;color:var(--accent);flex:none;padding-top:1px}
+.feeditem .x{flex:1;min-width:0}
+.feeditem .x b{display:block;font-size:12px;font-weight:550}
+.feeditem .x span{font-size:11px;color:var(--ink-3)}
+
+/* filters */
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.filters .lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-right:2px}
+input[type=search]{
+  background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+  padding:5px 10px;border-radius:5px;font-size:12px;min-width:190px;
+}
+
+/* toasts */
+#toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:9999}
+.toast{
+  background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--accent);
+  padding:10px 14px;border-radius:5px;font-size:12.5px;min-width:230px;max-width:340px;
+  box-shadow:0 8px 26px rgba(15,23,42,.14);animation:tin .22s ease-out;
+}
+.toast.err{border-left-color:var(--critical)}
+.toast.ok{border-left-color:var(--low)}
+.toast b{display:block;margin-bottom:2px}
+.toast span{color:var(--ink-3);font-size:11.5px}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ==================================================================
+   MULTI-DEPARTMENT PLATFORM -- login, identity, shared event workflow
+   ================================================================== */
+.dept-strip{height:3px;background:var(--dept,var(--accent));flex:none}
+#login{position:fixed;inset:0;z-index:5000;display:none;align-items:center;justify-content:center;
+  background:radial-gradient(1200px 600px at 20% 0%,#27447F 0%,#0F1B33 55%,#0A1224 100%)}
+#login.show{display:flex}
+.loginbox{width:min(400px,92vw);background:var(--panel);border-radius:10px;padding:0 28px 22px;
+  box-shadow:0 24px 70px rgba(0,0,0,.45);overflow:hidden}
+.loginbox .dept-strip{margin:0 -28px 24px;height:4px;background:linear-gradient(90deg,#2F6FED,#D2622A,#D93A3F,#188556)}
+.loginbox h1{font-size:19px;letter-spacing:.06em;font-weight:700}
+.loginbox .tagline{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin:5px 0 22px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:13px}
+.field label{font-size:11px;color:var(--ink-2);font-weight:600;letter-spacing:.02em}
+.input{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:inherit;
+  font-size:13px;color:var(--ink);width:100%}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+textarea.input{min-height:70px;resize:vertical}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{background:#2560D6;border-color:#2560D6;color:#fff}
+.btn.good{background:var(--low);border-color:var(--low);color:#fff;font-weight:600}
+.btn.warn{background:#FFF4F4;border-color:#F2B8BB;color:#B3242E}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.block{width:100%;padding:10px;font-size:13px;letter-spacing:.08em}
+.loginfoot{display:flex;justify-content:space-between;margin-top:14px;font-size:12px}
+.loginmsg{font-size:12px;margin-top:12px;min-height:17px;color:var(--ink-2)}
+.loginmsg.err{color:#C6323B}
+
+.userchip{display:flex;align-items:center;gap:8px;padding-left:4px}
+.userchip .avatar{width:28px;height:28px;border-radius:50%;background:var(--dept,var(--accent));color:#fff;
+  display:grid;place-items:center;font-weight:650;font-size:11px;flex:none}
+.userchip .who b{display:block;font-size:12px;line-height:1.2;font-weight:600}
+.userchip .who span{font-size:10.5px;color:var(--ink-3)}
+.bell{position:relative;font-size:14px;padding:4px 10px}
+.bell .count{position:absolute;top:-6px;right:-7px;background:var(--critical);color:#fff;font-size:9.5px;
+  border-radius:9px;padding:0 5px;min-width:17px;line-height:16px;text-align:center;font-weight:700}
+.brand{border-top:none}
+.brand span{color:var(--dept,var(--ink-3))!important}
+
+.status-pill{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:10px;
+  font-weight:650;letter-spacing:.03em;white-space:nowrap}
+.st-DETECTED{background:#FBE7E7;color:#B3242E}
+.st-VERIFIED{background:#FFF1D6;color:#8A5A00}
+.st-ASSIGNED{background:#E8F0FE;color:#1449B0}
+.st-IN_PROGRESS{background:#EDE7FC;color:#5B3CC4}
+.st-RESOLVED{background:#DDF3E8;color:#127047}
+.pipeline{display:inline-flex;gap:3px;align-items:center;vertical-align:middle}
+.pipeline i{width:12px;height:4px;border-radius:2px;background:var(--panel-3);display:block}
+.pipeline i.on{background:var(--accent)}
+.pipeline.done i.on{background:var(--low)}
+
+#drawerMask{position:fixed;inset:0;background:rgba(15,23,42,.30);z-index:3000;display:none}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(780px,100vw);background:var(--bg);z-index:3001;
+  transform:translateX(102%);transition:transform .22s ease;display:flex;flex-direction:column;
+  box-shadow:-12px 0 40px rgba(15,23,42,.20)}
+body.drawer-open #drawer{transform:none}
+body.drawer-open #drawerMask{display:block}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:0 16px;height:52px;background:var(--panel);
+  border-bottom:1px solid var(--line);flex:none}
+.drawer-head .grow{flex:1;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drawer-body{flex:1;overflow-y:auto;padding:16px;display:grid;gap:12px;align-content:start}
+.casehead .k{font-size:10.5px;letter-spacing:.16em;color:var(--dept-case,var(--ink-3));font-weight:700}
+.casehead h2{font-size:19px;font-weight:650;margin:3px 0 8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stepper{display:grid;grid-template-columns:repeat(5,1fr);margin:6px 0 14px}
+.step{text-align:center;position:relative;font-size:10.5px;color:var(--ink-3);letter-spacing:.03em}
+.step::before{content:"";display:block;width:14px;height:14px;border-radius:50%;margin:0 auto 6px;
+  background:var(--panel);border:2px solid var(--line);position:relative;z-index:1}
+.step::after{content:"";position:absolute;top:7px;left:-50%;width:100%;height:2px;background:var(--line);z-index:0}
+.step:first-child::after{display:none}
+.step.done::before{background:var(--low);border-color:var(--low)}
+.step.done::after,.step.current::after{background:var(--low)}
+.step.current::before{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-dim)}
+.step.current{color:var(--ink);font-weight:650}
+.step small{display:block;font-family:var(--mono);font-size:9.5px;color:var(--ink-3);font-weight:400;margin-top:1px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.actions .btn{padding:8px 15px;font-weight:600;letter-spacing:.04em}
+.actform{margin-top:12px;padding:12px;border:1px dashed var(--line);border-radius:6px;background:var(--panel-2)}
+.viewonly{font-size:12px;color:var(--ink-3)}
+.evtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.evidence-main{background:#0B1220;border-radius:6px;overflow:hidden}
+.evidence-main img,.evidence-main video{width:100%;display:block;max-height:440px;object-fit:contain;background:#0B1220}
+.evcap{font-size:11.5px;color:var(--ink-3);margin-top:7px}
+.plate{font-family:var(--mono);font-size:18px;font-weight:700;letter-spacing:.08em;padding:4px 10px;
+  border:2px solid var(--ink);border-radius:4px;display:inline-block;background:#FFFDF0}
+
+.notif{display:flex;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line-soft);align-items:flex-start}
+.notif:last-child{border-bottom:none}
+.notif.unread{background:#F5F8FF}
+.notif .bar{width:3px;align-self:stretch;border-radius:2px;background:var(--info);flex:none}
+.notif .bar.CRITICAL{background:var(--critical)} .notif .bar.HIGH{background:var(--high)}
+.notif .bar.MEDIUM{background:var(--medium)} .notif .bar.LOW{background:var(--low)}
+.notif .x{flex:1;min-width:0}
+.notif .x b{display:block;font-size:12.5px;font-weight:600}
+.notif .x span{font-size:11.5px;color:var(--ink-2)}
+.notif .when{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);white-space:nowrap}
+.udot{width:7px;height:7px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:6px}
+
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.gcard{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;cursor:pointer;
+  transition:box-shadow .15s}
+.gcard:hover{box-shadow:0 6px 20px rgba(15,23,42,.10)}
+.gcard .img{height:128px;background:#0B1220;display:grid;place-items:center;color:#8592A6;font-size:11px}
+.gcard .img img{width:100%;height:128px;object-fit:cover;display:block}
+.gcard .meta{padding:9px 11px;display:grid;gap:4px}
+.gcard .meta b{font-size:12.5px}
+.gcard .meta span{font-size:11px;color:var(--ink-3)}
+
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:4000;display:none;align-items:center;justify-content:center}
+.modal.show{display:flex}
+.modalbox{background:var(--panel);border-radius:8px;padding:18px 20px;width:min(440px,92vw);box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modalbox h3{font-size:14px;margin-bottom:12px}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 12px;align-items:end}
+select.btn{padding:5px 8px}
+.taskcard{display:flex;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line-soft);cursor:pointer}
+.taskcard:hover{background:var(--panel-2)}
+.taskcard img{width:64px;height:44px;object-fit:cover;border-radius:4px;background:var(--panel-3);flex:none}
+.taskcard .x{flex:1;min-width:0}
+.taskcard .x b{display:block;font-size:13px}
+.taskcard .x span{font-size:11.5px;color:var(--ink-3)}
+
+@media (max-width:1100px){
+  .detail,.live{grid-template-columns:1fr}
+  .shell{grid-template-columns:64px 1fr}
+  .brand h1,.brand span,nav a span.lbl,.nav-group,.side-foot{display:none}
+  nav a{justify-content:center}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <aside>
+    <div class="dept-strip"></div>
+    <div class="brand">
+      <h1>Urban Intelligence</h1>
+      <span>Command Center</span>
+    </div>
+    <nav id="nav"></nav>
+    <div class="side-foot" id="sideFoot">—</div>
+  </aside>
+
+  <main>
+    <header class="top">
+      <div>
+        <h2 id="viewTitle">Dashboard</h2>
+        <div class="sub" id="viewSub">—</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="status"><span class="dot" id="healthDot"></span><span id="healthText">connecting…</span></div>
+      <button class="btn" id="refreshBtn">Refresh</button>
+      <button class="btn" id="autoBtn">Auto-refresh: off</button>
+      <button class="btn bell" id="bellBtn" title="Notifications" aria-label="Notifications">&#128276;<span class="count" id="bellCount" hidden></span></button>
+      <div class="userchip" id="userChip"></div>
+      <button class="btn" id="pwBtn" title="Change password">&#128273;</button>
+      <button class="btn" id="logoutBtn">Log out</button>
+    </header>
+    <section class="view" id="view"></section>
+  </main>
+</div>
+
+<div id="toasts"></div>
+
+<!-- login: shared with the mobile app through POST /auth/login -->
+<div id="login">
+  <form class="loginbox" id="loginForm" autocomplete="on">
+    <div class="dept-strip"></div>
+    <h1>URBAN INTELLIGENCE</h1>
+    <div class="tagline">Command Center &middot; Department Dashboards</div>
+    <div class="field"><label for="loginUser">Email / Username</label>
+      <input class="input" id="loginUser" name="username" autocomplete="username" required></div>
+    <div class="field"><label for="loginPass">Password</label>
+      <input class="input" id="loginPass" name="password" type="password" autocomplete="current-password" required></div>
+    <button class="btn primary block" id="loginBtn" type="submit">LOGIN</button>
+    <div class="loginfoot"><a href="#" id="forgotLink">Forgot password</a><a href="/mobile/">Mobile app &rarr;</a></div>
+    <div class="loginmsg" id="loginMsg"></div>
+  </form>
+</div>
+
+<!-- one managed event (EV-xxxx): evidence, lifecycle, activity -->
+<div id="drawerMask"></div>
+<div id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+  <div class="drawer-head">
+    <div class="grow" id="drawerTitle">Event</div>
+    <button class="btn" id="drawerClose">Close &#10005;</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="modalbox">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+    <div class="loginmsg err" id="modalMsg"></div>
+    <div class="actions" style="justify-content:flex-end;margin-top:8px">
+      <button class="btn" id="modalCancel">Cancel</button>
+      <button class="btn primary" id="modalOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+"use strict";
+
+/* ==================================================================
+   1.  API layer
+   ================================================================== */
+const API = "";
+const cache = new Map();
+
+/* The session is the HttpOnly cookie set by POST /auth/login, so every
+   fetch, <img src="/evidence/..."> and <video src="/videos/..."> below is
+   authenticated without the page ever holding the token. */
+function errText(body, fallback=""){
+  if(!body) return fallback;
+  const d = body.detail;
+  if(typeof d === "string") return d;
+  if(d && d.message) return d.message;
+  if(Array.isArray(d) && d[0] && d[0].msg) return d[0].msg;
+  return fallback;
+}
+
+async function api(path, {fresh=false, method="GET", body=null}={}){
+  const isGet = method === "GET";
+  if(isGet && !fresh && cache.has(path)) return cache.get(path);
+  const res = await fetch(API + path, {
+    method, credentials:"same-origin",
+    headers: body !== null ? {"Content-Type":"application/json"} : {},
+    body: body !== null ? JSON.stringify(body) : undefined,
+  });
+  if(res.status === 401){
+    if(typeof showLogin === "function") showLogin("Your session has ended. Please log in again.");
+    const e = new Error("Login required"); e.status = 401; throw e;
+  }
+  if(!res.ok){
+    let payload = null; try{ payload = await res.json(); }catch(_){}
+    const e = new Error(`${res.status} · ${errText(payload, res.statusText)}`);
+    e.status = res.status; e.body = payload; throw e;
+  }
+  const data = await res.json();
+  if(isGet) cache.set(path, data); else cache.clear();
+  return data;
+}
+const post = (path, body={}) => api(path, {method:"POST", body});
+const patch = (path, body={}) => api(path, {method:"PATCH", body});
+function clearCache(){ cache.clear(); }
+
+/* ==================================================================
+   2.  Small helpers
+   ================================================================== */
+const $ = (sel, root=document) => root.querySelector(sel);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => (
+  {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = n => (n === null || n === undefined || n === "") ? "–"
+  : (typeof n === "number" ? n.toLocaleString(undefined,{maximumFractionDigits:2}) : n);
+const pct = n => n === null || n === undefined ? "–" : `${Math.round(n)}%`;
+
+function clock(ts){
+  if(!ts) return "–";
+  const d = new Date(ts);
+  if(isNaN(d)) return String(ts).slice(11,19);
+  return d.toLocaleTimeString([], {hour12:false});
+}
+function stamp(ts){
+  if(!ts) return "–";
+  const d = new Date(ts);
+  if(isNaN(d)) return String(ts);
+  return d.toLocaleString([], {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+}
+const vtime = s => (s === null || s === undefined) ? "–"
+  : `${String(Math.floor(s/60)).padStart(2,"0")}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+const title = s => String(s||"").replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase());
+const sev = s => `<span class="sev ${esc(s||"INFO")}">${esc(s||"INFO")}</span>`;
+// /events returns gps nested; /issues and /heatmap return it flattened.
+function latlon(e){
+  const g = e && e.gps;
+  const lat = (g && g.latitude != null) ? g.latitude : e.latitude;
+  const lon = (g && g.longitude != null) ? g.longitude : e.longitude;
+  return (lat == null || lon == null) ? null : [+lat, +lon];
+}
+const gps = e => { const p = latlon(e);
+  return p ? `${p[0].toFixed(5)}, ${p[1].toFixed(5)}` : "–"; };
+const meta = e => e.metadata || {};
+
+function thumb(path, alt="evidence"){
+  if(!path) return `<span class="tag">none</span>`;
+  return `<img class="thumb" loading="lazy" src="/evidence/${encodeURI(path)}" alt="${esc(alt)}"
+          onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'tag',textContent:'missing'}))">`;
+}
+
+function toast(text, detail="", kind=""){
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  el.innerHTML = `<b>${esc(text)}</b>${detail ? `<span>${esc(detail)}</span>` : ""}`;
+  $("#toasts").appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.remove(), 300); }, 4200);
+}
+
+const loading = (rows=5) => `<div class="tablewrap">${
+  Array.from({length:rows}, () => `<div class="skelrow">
+    <div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>`).join("")}</div>`;
+
+const empty = (head, note) => `<div class="empty"><strong>${esc(head)}</strong>${esc(note||"")}</div>`;
+const errorBox = e => `<div class="errorbox"><strong>Could not load this view</strong><br>${esc(e.message||e)}</div>`;
+
+function card(title, bodyHtml, {right="", pad=true}={}){
+  return `<div class="card">
+    <h3>${esc(title)}${right ? `<span class="right">${right}</span>` : ""}</h3>
+    ${pad ? `<div class="body">${bodyHtml}</div>` : bodyHtml}
+  </div>`;
+}
+
+function table(cols, rows, rowFn, {onclick=null}={}){
+  if(!rows.length) return empty("Nothing recorded yet", "Run the pipeline over a video and this table fills in.");
+  return `<div class="tablewrap"><table>
+    <thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map((r,i) => `<tr class="${onclick?"clickable":""}" ${onclick?`data-idx="${i}"`:""}>${rowFn(r)}</tr>`).join("")}</tbody>
+  </table></div>`;
+}
+
+/* ==================================================================
+   3.  Charts  (hand-drawn SVG, from real backend rows only)
+   ================================================================== */
+function barChart(pairs, {height=null, color="var(--accent)"}={}){
+  if(!pairs.length) return empty("No data yet","");
+  const max = Math.max(...pairs.map(p => p[1]), 1);
+  const rowH = 22, h = height || pairs.length * rowH + 6;
+  const labelW = 152;
+  return `<svg class="chart" viewBox="0 0 520 ${h}" role="img">
+    ${pairs.map(([k,v],i) => {
+      const y = i*rowH + 4, w = Math.max(2, (v/max) * (520-labelW-46));
+      return `<g>
+        <text x="0" y="${y+11}" class="barlabel">${esc(title(k)).slice(0,26)}</text>
+        <rect x="${labelW}" y="${y+2}" width="${w}" height="11" rx="2" fill="${color}" opacity="0.85"></rect>
+        <text x="${labelW+w+7}" y="${y+11}" class="barlabel" style="fill:var(--ink)">${v}</text>
+      </g>`;
+    }).join("")}
+  </svg>`;
+}
+
+function lineChart(points, {label="", unit=""}={}){
+  const vals = points.map(p => p.v).filter(v => v != null);
+  if(vals.length < 2) return empty("Not enough samples yet",
+    "The traffic module writes an observation every few seconds of video.");
+  const W = 640, H = 150, pad = {l:34, r:10, t:12, b:20};
+  const max = Math.max(...vals), min = Math.min(0, Math.min(...vals));
+  const span = (max - min) || 1;
+  const x = i => pad.l + i * (W - pad.l - pad.r) / (points.length - 1);
+  const y = v => pad.t + (H - pad.t - pad.b) * (1 - (v - min) / span);
+  const d = points.map((p,i) => `${i?"L":"M"}${x(i).toFixed(1)},${y(p.v ?? min).toFixed(1)}`).join("");
+  const area = `${d}L${x(points.length-1).toFixed(1)},${y(min)}L${x(0).toFixed(1)},${y(min)}Z`;
+  const ticks = [min, min+span/2, max];
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">
+    <g class="grid">${ticks.map(t => `<line x1="${pad.l}" x2="${W-pad.r}" y1="${y(t)}" y2="${y(t)}"></line>`).join("")}</g>
+    ${ticks.map(t => `<text x="0" y="${y(t)+3}">${Math.round(t)}</text>`).join("")}
+    <path d="${area}" fill="var(--accent)" opacity="0.13"></path>
+    <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linejoin="round"></path>
+    <circle cx="${x(points.length-1)}" cy="${y(points[points.length-1].v ?? min)}" r="3" fill="var(--accent)"></circle>
+    <text x="${pad.l}" y="${H-5}">${esc(points[0].t)}</text>
+    <text x="${W-pad.r}" y="${H-5}" text-anchor="end">${esc(points[points.length-1].t)}${unit?" "+esc(unit):""}</text>
+  </svg>`;
+}
+
+/* ==================================================================
+   4.  Map  (Leaflet when reachable, SVG scatter when not)
+   ================================================================== */
+const SEV_COLOR = {CRITICAL:"#D93A3F",HIGH:"#D2622A",MEDIUM:"#B4740A",LOW:"#188556",INFO:"#5E6B7D"};
+const KIND_COLOR = {
+  road_defect:"#D2622A", traffic:"#2F6FED", incident:"#D93A3F",
+  hit_and_run:"#E23B4A", issue:"#B4740A"
+};
+const maps = {};                     // elId -> Leaflet map (several per page)
+function dropMaps(){
+  Object.keys(maps).forEach(k => { try{ maps[k].remove(); }catch(_){} delete maps[k]; });
+}
+
+function renderMap(elId, markers, {lines=[]}={}){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  if(maps[elId]){ try{ maps[elId].remove(); }catch(_){} delete maps[elId]; }
+  if(!markers.length && !lines.length){
+    el.innerHTML = `<div class="mapfallback">${empty("Nothing to show on this map",
+      "Only events with GPS appear here, and only the layers your department may see.")}</div>`;
+    return;
+  }
+  if(typeof L === "undefined"){          // offline / CDN blocked -> SVG fallback
+    el.innerHTML = svgScatter(markers, lines);
+    return;
+  }
+  el.innerHTML = "";
+  const map = L.map(elId, {zoomControl:true, attributionControl:false});
+  maps[elId] = map;
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19})
+   .addTo(map)
+   .on("tileerror", () => { /* tiles unreachable: markers still render on the grey ground */ });
+  const layer = L.layerGroup().addTo(map);
+  const bounds = [];
+  lines.forEach(line => {
+    if(!line.points || line.points.length < 2) return;
+    line.points.forEach(p => bounds.push(p));
+    L.polyline(line.points, {color: line.color || "#2F6FED", weight: 3, opacity: .7}).addTo(layer);
+  });
+  markers.forEach(m => {
+    bounds.push([m.lat, m.lon]);
+    const big = m.kind === "hit_and_run" || m.radius;
+    L.circleMarker([m.lat, m.lon], {
+      radius: m.radius || (m.kind === "hit_and_run" ? 9 : 6),
+      color: m.color, fillColor: m.color, fillOpacity: m.hollow ? .15 : .75,
+      weight: big ? 3 : 1.5,
+    }).addTo(layer).bindPopup(m.popup);
+  });
+  if(bounds.length) map.fitBounds(bounds, {padding:[28,28], maxZoom:17});
+}
+
+function svgScatter(markers, lines=[]){
+  const pts = [...markers.map(m => [m.lat, m.lon]), ...lines.flatMap(l => l.points || [])];
+  const lats = pts.map(p => p[0]), lons = pts.map(p => p[1]);
+  const minLa = Math.min(...lats), maxLa = Math.max(...lats);
+  const minLo = Math.min(...lons), maxLo = Math.max(...lons);
+  const W = 900, H = 320, pad = 26;
+  const px = lo => pad + ((lo - minLo) / ((maxLo - minLo) || 1)) * (W - 2*pad);
+  const py = la => H - pad - ((la - minLa) / ((maxLa - minLa) || 1)) * (H - 2*pad);
+  return `<div class="mapfallback">
+    <svg class="chart" viewBox="0 0 ${W} ${H}">
+      <rect x="0" y="0" width="${W}" height="${H}" fill="#F1F4F9" rx="6"></rect>
+      ${lines.map(l => `<polyline fill="none" stroke="${l.color||"#2F6FED"}" stroke-width="2.5" opacity=".7"
+          points="${(l.points||[]).map(p => `${px(p[1]).toFixed(1)},${py(p[0]).toFixed(1)}`).join(" ")}"></polyline>`).join("")}
+      ${markers.map(m => `<circle cx="${px(m.lon).toFixed(1)}" cy="${py(m.lat).toFixed(1)}"
+          r="${m.radius || (m.kind==="hit_and_run"?7:5)}" fill="${m.color}" fill-opacity="${m.hollow?0.2:0.8}"
+          stroke="${m.color}" ${m.case_id?`data-case="${esc(m.case_id)}" style="cursor:pointer"`:""}>
+          <title>${esc(m.title)}${m.case_id?` (${esc(m.case_id)}, click to open)`:""}</title></circle>`).join("")}
+      <text x="${pad}" y="${H-8}">${minLo.toFixed(4)}</text>
+      <text x="${W-pad}" y="${H-8}" text-anchor="end">${maxLo.toFixed(4)}</text>
+    </svg>
+    <div class="legend">Map tiles unavailable, so GPS positions are plotted directly.
+      Latitude ${minLa.toFixed(4)} to ${maxLa.toFixed(4)}. Click a marker to open its event.</div>
+  </div>`;
+}
+
+/* GIS layers from GET /map/layers -- already filtered to the user's role
+   on the server; this only turns them into markers. */
+const LAYER_COLOR = {
+  buses:"#188556", potholes:"#D2622A", damaged_roads:"#B4740A", waterlogging:"#1E88E5",
+  traffic:"#2F6FED", incidents:"#D93A3F", anpr:"#7B4FD6", road_assets:"#5E6B7D",
+  persistent_issues:"#8A6212",
+};
+const LEVEL_COLOR = {LOW:"#188556", MEDIUM:"#B4740A", HIGH:"#D2622A", CRITICAL:"#D93A3F"};
+const LAYER_LABEL = {
+  buses:"Buses", potholes:"Potholes", damaged_roads:"Damaged roads", waterlogging:"Waterlogging",
+  traffic:"Traffic", incidents:"Incidents", anpr:"ANPR", road_assets:"Road assets",
+  persistent_issues:"Persistent issues",
+};
+function layerMarkers(layers){
+  const out = [];
+  Object.entries(layers || {}).forEach(([kind, rows]) => (rows || []).forEach(r => {
+    if(r.lat == null || r.lon == null) return;
+    const resolved = r.status === "RESOLVED";
+    const color = resolved ? "#9AA5B5"
+      : kind === "traffic" && r.level ? (LEVEL_COLOR[r.level] || LAYER_COLOR.traffic)
+      : (LAYER_COLOR[kind] || "#5E6B7D");
+    out.push({
+      lat:+r.lat, lon:+r.lon, kind, color, case_id:r.case_id || null, title:r.title || kind,
+      hollow: kind === "road_assets" && !r.case_id, radius: kind === "buses" ? 8 : null,
+      popup: `<b>${esc(r.title || LAYER_LABEL[kind])}</b><br>
+        <span style="color:#576375">${esc(r.subtitle || "")}</span><br>
+        ${r.status ? (STATUS_SET.has(r.status) ? statusPill(r.status) : `<span class="tag">${esc(title(r.status))}</span>`) : ""}
+        ${r.severity && r.severity !== "INFO" ? sev(r.severity) : ""}
+        ${r.case_id ? `<br><a href="#" data-case="${esc(r.case_id)}"><b>Open ${esc(r.case_id)} &rarr;</b></a>` : ""}`,
+    });
+  }));
+  return out;
+}
+async function renderLayerMap(elId, {layers=null, department=null}={}){
+  const q = new URLSearchParams();
+  if(layers) q.set("layers", layers.join(","));
+  if(department && department !== "ALL") q.set("department", department);
+  const data = await api(`/map/layers?${q}`, {fresh:true});
+  renderMap(elId, layerMarkers(data.layers));
+  return data;
+}
+
+function eventMarkers(events){
+  return events.map(e => [e, latlon(e)]).filter(([,p]) => p).map(([e,p]) => {
+    const kind = e.event_type === "hit_and_run" ? "hit_and_run"
+      : e.event_type === "road_defect" ? "road_defect"
+      : e.event_type.startsWith("traffic") ? "traffic" : "incident";
+    return {
+      lat:p[0], lon:p[1], kind,
+      color: SEV_COLOR[e.severity] || KIND_COLOR[kind],
+      title: `${title(e.event_type)} — ${e.class_name||""}`,
+      popup: `<b>${esc(title(e.event_type))}</b><br>
+        ${esc(e.class_name||"")} ${e.track_id!=null?`· track #${e.track_id}`:""}<br>
+        ${esc(stamp(e.timestamp))}<br>
+        conf ${(+e.confidence||0).toFixed(2)} · ${esc(e.severity||"")}<br>
+        ${esc(e.bus_id||"")} / ${esc(e.camera_id||"")}<br>
+        ${e.issue_id?`issue <b>${esc(e.issue_id)}</b><br>`:""}
+        ${meta(e).registration_number?`plate <b>${esc(meta(e).registration_number)}</b>`:""}`,
+    };
+  });
+}
+
+/* ==================================================================
+   5.  Views
+   ================================================================== */
+const ROUTES = [
+  {id:"dashboard", label:"Dashboard",      ico:"▣", group:"Overview"},
+  {id:"live",      label:"Live Analysis",  ico:"▶"},
+  {id:"map",       label:"GIS Map",        ico:"◎"},
+  {id:"incidents", label:"Incidents",      ico:"⚠", group:"Operations", badge:"incidents"},
+  {id:"hitrun",    label:"Hit-and-Run",    ico:"⛔", badge:"hitrun"},
+  {id:"anpr",      label:"Vehicles / ANPR",ico:"▤"},
+  {id:"traffic",   label:"Traffic",        ico:"≋", group:"Infrastructure"},
+  {id:"road",      label:"Road Assets",    ico:"◫", badge:"defects"},
+  {id:"issues",    label:"Persistent Issues", ico:"◈"},
+  {id:"analytics", label:"Analytics",      ico:"◧"},
+  // ---- multi-department platform ------------------------------------
+  {id:"events",         label:"Event Management",  ico:"☰", badge:"open"},
+  {id:"evidence",       label:"Evidence",          ico:"▦"},
+  {id:"notifications",  label:"Notifications",     ico:"✉", badge:"unread"},
+  {id:"fleet",          label:"Fleet Management",  ico:"⛟"},
+  {id:"users",          label:"Users / Departments", ico:"◉"},
+  {id:"traffic_home",   label:"Traffic Overview",  ico:"▣"},
+  {id:"roads_home",     label:"Roads Overview",    ico:"▣"},
+  {id:"safety_home",    label:"Safety Overview",   ico:"▣"},
+  {id:"transport_home", label:"Transport Overview",ico:"▣"},
+  {id:"field_home",     label:"My Tasks",          ico:"✓", badge:"mine"},
+];
+
+/* Each department gets its own sidebar.  The server decides WHICH pages a
+   role may open (permissions.pages from /auth/me, enforced again on every
+   API call); this only decides how they are grouped and labelled. */
+const NAV = {
+  CENTRAL_COMMAND: [
+    ["Overview", ["dashboard","live","map"]],
+    ["Operations", ["events","incidents","hitrun","anpr","evidence","notifications"]],
+    ["Infrastructure", ["traffic","road","issues","analytics"]],
+    ["Administration", ["fleet","users"]],
+  ],
+  TRAFFIC_DEPARTMENT: [
+    ["Traffic Department", ["traffic_home","traffic","map"]],
+    ["Work", ["events","evidence","notifications"]],
+  ],
+  ROADS_INFRASTRUCTURE: [
+    ["Roads & Infrastructure", ["roads_home","road","issues","map"]],
+    ["Work", ["events","evidence","notifications"]],
+  ],
+  PUBLIC_SAFETY: [
+    ["Public Safety", ["safety_home","incidents","hitrun","anpr","map"]],
+    ["Work", ["events","evidence","notifications"]],
+  ],
+  TRANSPORT_AUTHORITY: [
+    ["Transport Authority", ["transport_home","fleet","map"]],
+    ["Work", ["events","notifications"]],
+  ],
+  FIELD_OFFICER: [
+    ["Field Operations", ["field_home","events","map","evidence"]],
+    ["Inbox", ["notifications"]],
+  ],
+};
+const NAV_LABEL = {
+  TRAFFIC_DEPARTMENT:  {traffic_home:"Overview", traffic:"Traffic Analytics", map:"Traffic Map", events:"Traffic Issues"},
+  ROADS_INFRASTRUCTURE:{roads_home:"Overview", road:"Road Assets", issues:"Persistent Issues", map:"Road-Condition Map", events:"Road Issues"},
+  PUBLIC_SAFETY:       {safety_home:"Overview", incidents:"Incident Tracking", anpr:"ANPR Evidence", map:"Incident Map", events:"Safety Cases"},
+  TRANSPORT_AUTHORITY: {transport_home:"Overview", fleet:"Fleet & Routes", map:"Bus Map", events:"Route Impact Events"},
+  FIELD_OFFICER:       {field_home:"My Tasks", events:"Department Events", map:"Nearby Map"},
+};
+
+const views = {};
+
+/* ---------------------------------------------- Dashboard */
+views.dashboard = async () => {
+  const [an, ev, hm, incidents] = await Promise.all([
+    api("/analytics"), api("/events?limit=250"), api("/heatmap"), api("/incidents?limit=40"),
+  ]);
+  const byType = an.events_by_type || {};
+  const hitruns = byType.hit_and_run || 0;
+  const defects = byType.road_defect || 0;
+  const activeIncidents = incidents.filter(i => (meta(i).status || "suspected") !== "cleared").length;
+  const congestion = (an.events_by_severity || {});
+  const heavy = (byType.traffic_congestion || 0) + (byType.traffic_bottleneck || 0);
+  const openIssues = (an.issues_by_status || {}).OPEN || 0;
+
+  const timeline = (an.traffic_timeline || []).map(r => ({
+    t: vtime(r.video_time_s), v: r.vehicle_count,
+  }));
+
+  const kpis = `<div class="kpis">
+    ${kpi("Total events", an.events_total, "across all modules", "acc")}
+    ${kpi("Active incidents", activeIncidents, "collision · rash · hit-and-run", activeIncidents?"high":"")}
+    ${kpi("Hit-and-run alerts", hitruns, hitruns?"identification requested":"none detected", hitruns?"crit":"ok")}
+    ${kpi("Road defects", defects, "reported by module 1", defects?"med":"")}
+    ${kpi("Congestion events", heavy, "high / critical traffic", heavy?"med":"")}
+    ${kpi("Persistent issues", openIssues, `${an.issues_total||0} tracked in total`, "acc")}
+  </div>`;
+
+  const markers = eventMarkers(ev);
+  const recentIncidents = incidents.slice(0,7);
+
+  return kpis + `
+  <div class="grid" style="grid-template-columns:minmax(0,1fr);margin-top:12px">
+    ${card("Event locations", `<div id="map"></div>
+      <div class="legend">
+        <span><i style="background:#D93A3F"></i>Incident</span>
+        <span><i style="background:#E23B4A"></i>Hit-and-run</span>
+        <span><i style="background:#D2622A"></i>Road defect</span>
+        <span><i style="background:#2F6FED"></i>Traffic</span>
+        <span style="color:var(--ink-3)">${markers.length} located events</span>
+      </div>`, {pad:false, right:`${ev.length} events loaded`})}
+  </div>
+  <div class="grid" style="grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);margin-top:12px">
+    ${card("Traffic over the run", lineChart(timeline, {label:"vehicles per observation"}),
+        {right: timeline.length ? `${timeline.length} observations` : ""})}
+    ${card("Events by type", barChart(Object.entries(byType).sort((a,b)=>b[1]-a[1])))}
+  </div>
+  <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+    ${card("Recent incidents", table(
+      ["Time","Type","Vehicle","Confidence","Status"], recentIncidents,
+      i => `<td class="mono">${clock(i.timestamp)}</td>
+            <td>${title(i.event_type)}</td>
+            <td class="mono">#${i.track_id ?? "–"} ${esc(i.class_name||"")}</td>
+            <td class="num">${(+i.confidence||0).toFixed(2)}</td>
+            <td>${statusTag(i)}</td>`), {pad:false,
+      right:`<a href="#incidents">view all</a>`})}
+    ${card("Priority issues", table(
+      ["Issue","Type","Obs","Priority","Department"], (an.top_issues||[]).slice(0,7),
+      i => `<td><span class="id">${esc(i.issue_id)}</span></td>
+            <td>${title(i.issue_type)}</td>
+            <td class="num">${i.observation_count}</td>
+            <td class="num">${(+i.priority_score||0).toFixed(0)}</td>
+            <td>${esc(i.department||"–")}</td>`), {pad:false,
+      right:`<a href="#issues">view all</a>`})}
+  </div>`;
+};
+views.dashboard.after = async () => {
+  const ev = await api("/events?limit=250");
+  renderMap("map", eventMarkers(ev));
+};
+
+function kpi(label, value, note, cls=""){
+  return `<div class="kpi ${cls}"><div class="k">${esc(label)}</div>
+    <div class="v">${num(value ?? 0)}</div><div class="n">${esc(note||"")}</div></div>`;
+}
+function statusTag(i){
+  const s = meta(i).status || "suspected";
+  const synth = meta(i).synthetic ? `<span class="tag synthetic" title="scripted demo scenario, not a detection">SYNTHETIC</span> ` : "";
+  return `${synth}<span class="tag ${s === "confirmed" ? "confirmed" : "suspected"}">${esc(s)}</span>`;
+}
+const anySynthetic = rows => rows.some(r => meta(r).synthetic);
+const synthBanner = rows => anySynthetic(rows) ? `<div class="synthbanner">
+  <b>Some records below are marked SYNTHETIC.</b> They were produced by
+  <code class="mono">scripts/demo_hit_and_run.py</code> or <code class="mono">--demo-incident</code>:
+  the detection, state-machine, ANPR and database code is real, the vehicle positions are scripted.
+  They are demonstrations, not detections.</div>` : "";
+
+/* ---------------------------------------------- Live analysis */
+views.live = async () => {
+  const [vids, ev] = await Promise.all([api("/videos"), api("/events?limit=400")]);
+  const list = vids.videos || [];
+  const timed = ev.filter(e => e.video_time_s != null)
+                  .sort((a,b) => a.video_time_s - b.video_time_s);
+
+  if(!list.length){
+    return card("Live / video analysis", empty(
+      "No annotated video yet",
+      "Run the pipeline without --no-video and the annotated .mp4 appears here, "
+      + "with the event feed synchronised to the timeline."));
+  }
+
+  const options = list.map(v => `<option value="${esc(v.url)}">${esc(stamp(v.modified*1000))} — ${v.size_mb} MB</option>`).join("");
+  return `<div class="filters">
+      <span class="lbl">Recording</span>
+      <select id="vidSelect" class="btn">${options}</select>
+      <span class="lbl" style="margin-left:10px">${timed.length} timestamped events</span>
+    </div>
+    <div class="live">
+      ${card("Annotated detection output",
+        `<video id="liveVideo" controls preload="metadata" src="${esc(list[0].url)}"></video>
+         <div class="legend" style="border-top:none;padding-left:0">
+           <span><i style="background:#00DC00"></i>Vehicle + track id</span>
+           <span><i style="background:#0096FF"></i>Road defect</span>
+           <span><i style="background:#00C8FF"></i>Post-collision monitoring</span>
+         </div>`)}
+      ${card("Event feed", `<div class="eventfeed" id="feed">${
+        timed.length ? timed.map((e,i) => `
+          <div class="feeditem" data-i="${i}" data-t="${e.video_time_s}">
+            <span class="t">${vtime(e.video_time_s)}</span>
+            <span class="x">
+              <b>${feedIcon(e.event_type)} ${title(e.event_type)}</b>
+              <span>${esc(e.class_name||"")}${e.track_id!=null?` · track #${e.track_id}`:""}
+                    · conf ${(+e.confidence||0).toFixed(2)}
+                    ${meta(e).registration_number?` · ${esc(meta(e).registration_number)}`:""}</span>
+            </span>
+          </div>`).join("")
+        : empty("No timestamped events","")
+      }</div>`, {pad:false, right:"click to seek"})}
+    </div>`;
+};
+views.live.after = () => {
+  const video = $("#liveVideo"), feed = $("#feed"), select = $("#vidSelect");
+  if(select) select.onchange = () => { video.src = select.value; video.load(); };
+  if(!video || !feed) return;
+  feed.querySelectorAll(".feeditem").forEach(item => {
+    item.onclick = () => {
+      video.currentTime = Math.max(0, parseFloat(item.dataset.t) - 1.5);
+      video.play().catch(() => {});
+    };
+  });
+  video.ontimeupdate = () => {
+    const t = video.currentTime;
+    let active = null;
+    feed.querySelectorAll(".feeditem").forEach(item => {
+      const it = parseFloat(item.dataset.t);
+      item.classList.remove("active");
+      if(it <= t + 0.35) active = item;
+    });
+    if(active){
+      active.classList.add("active");
+      const box = feed.getBoundingClientRect(), row = active.getBoundingClientRect();
+      if(row.top < box.top || row.bottom > box.bottom) active.scrollIntoView({block:"nearest"});
+    }
+  };
+};
+const feedIcon = t => ({
+  hit_and_run:"⛔", collision:"⚠", possible_collision:"⚠", rash_driving:"⚡",
+  abnormal_movement:"⚡", vehicle_identification:"▤", road_defect:"◫",
+  pedestrian_vehicle_risk:"🚸",
+}[t] || "•");
+
+/* ---------------------------------------------- Incidents */
+let incidentFilter = "all";
+views.incidents = async () => {
+  const q = incidentFilter === "all" ? "" : `&event_type=${incidentFilter}`;
+  const rows = await api(`/incidents?limit=300${q}`);
+  const chips = [
+    ["all","All"],["collision","Collision"],["hit_and_run","Hit-and-run"],
+    ["rash_driving","Rash driving"],["pedestrian_vehicle_risk","Pedestrian risk"],
+    ["possible","Possible incident"],
+  ].map(([v,l]) => `<button class="btn ${incidentFilter===v?"on":""}" data-f="${v}">${l}</button>`).join("");
+
+  return synthBanner(rows) + `<div class="filters"><span class="lbl">Filter</span>${chips}
+      <span class="lbl" style="margin-left:auto">${rows.length} records</span></div>
+    ${card("Incident register", table(
+      ["Incident","Type","Status","Conf","Time","Vehicle","Plate","Location","Evidence"], rows,
+      r => `<td><span class="id">${esc(meta(r).incident_id || r.event_id.slice(0,8))}</span></td>
+            <td>${feedIcon(r.event_type)} ${title(r.event_type)}</td>
+            <td>${statusTag(r)}</td>
+            <td class="num">${(+r.confidence||0).toFixed(2)}</td>
+            <td class="mono">${stamp(r.timestamp)}</td>
+            <td class="mono">#${r.track_id ?? "–"} ${esc(r.class_name||"")}</td>
+            <td class="mono">${esc(meta(r).registration_number || "–")}</td>
+            <td class="mono">${gps(r)}</td>
+            <td>${thumb(r.evidence_image)}</td>`,
+      {onclick:true}), {pad:false})}
+    <div id="incidentDetail" style="margin-top:12px"></div>`;
+};
+views.incidents.after = async () => {
+  document.querySelectorAll("[data-f]").forEach(b => b.onclick = () => {
+    incidentFilter = b.dataset.f; render();
+  });
+  const q = incidentFilter === "all" ? "" : `&event_type=${incidentFilter}`;
+  const rows = await api(`/incidents?limit=300${q}`);
+  document.querySelectorAll("tbody tr.clickable").forEach(tr => {
+    tr.onclick = () => openIncident(rows[+tr.dataset.idx], "#incidentDetail");
+  });
+};
+
+async function openIncident(row, target){
+  const host = $(target);
+  if(!row || !host) return;
+  host.innerHTML = card("Incident detail", loading(3), {pad:false});
+  const id = meta(row).incident_id || row.event_id;
+  try{
+    const d = await api(`/incidents/${encodeURIComponent(id)}`, {fresh:true});
+    host.innerHTML = incidentDetailHtml(d);
+    host.scrollIntoView({behavior:"smooth", block:"nearest"});
+  }catch(e){
+    host.innerHTML = card("Incident detail", errorBox(e));
+  }
+}
+
+function incidentDetailHtml(d){
+  const i = d.incident, m = meta(i), ident = d.identification;
+  const plate = ident ? meta(ident).registration_number : m.registration_number;
+  const conf = ident ? meta(ident).plate_confidence : m.plate_confidence;
+
+  const facts = `<dl class="kv">
+    <dt>Incident</dt><dd><span class="id">${esc(d.incident_id)}</span></dd>
+    ${d.case_id ? `<dt>Managed event</dt><dd><a href="#" data-case="${esc(d.case_id)}"><b>${esc(d.case_id)}</b> · open evidence and workflow</a></dd>` : ""}
+    <dt>Type</dt><dd>${title(i.event_type)}</dd>
+    <dt>Status</dt><dd>${statusTag(i)} ${m.state?`<span class="tag state">${esc(m.state)}</span>`:""}</dd>
+    ${m.synthetic?`<dt>Provenance</dt><dd style="color:#1668A8">${esc(m.synthetic_note||"scripted demo scenario — not a detection")}</dd>`:""}
+    <dt>Confidence</dt><dd>${(+i.confidence||0).toFixed(2)} · ${sev(i.severity)}</dd>
+    <dt>Time</dt><dd class="mono">${stamp(i.timestamp)} · video ${vtime(i.video_time_s)}</dd>
+    <dt>Bus / camera</dt><dd class="mono">${esc(i.bus_id||"–")} / ${esc(i.camera_id||"–")}</dd>
+    <dt>Location</dt><dd class="mono">${gps(i)}${i.road_segment?` · ${esc(i.road_segment)}`:""}</dd>
+    <dt>Vehicle</dt><dd class="mono">track #${m.vehicle_track_id ?? i.track_id ?? "–"} · ${esc(m.vehicle_class||i.class_name||"–")}</dd>
+    ${m.other_track_id!=null?`<dt>Other party</dt><dd class="mono">track #${esc(m.other_track_id)} · ${esc(m.other_type||"")}</dd>`:""}
+    <dt>Registration</dt><dd class="mono">${plate ? `<b>${esc(plate)}</b> ${conf!=null?`(${(+conf).toFixed(2)})`:""}` : "not requested"}</dd>
+    <dt>Detector</dt><dd class="mono">${esc(m.detector||"–")}</dd>
+    ${m.escape_distance_px!=null?`<dt>Escape</dt><dd class="mono">${num(m.escape_distance_px)} px at ${num(m.escape_speed_px_s)} px/s, ${esc(m.escape_direction||"")}</dd>`:""}
+    ${m.iou!=null?`<dt>Contact</dt><dd class="mono">IoU ${num(m.iou)} · approach ${num(m.approach)} · motion ${num(m.motion_change)}</dd>`:""}
+    <dt>Evidence basis</dt><dd>${esc(m.evidence||"–")}</dd>
+  </dl>`;
+
+  const steps = (d.timeline||[]).length ? `<div class="timeline">${
+    d.timeline.map(s => `<div class="tstep ${s.state==="HIT_AND_RUN_CONFIRMED"?"hit":s.state==="VEHICLE_LEAVING"?"leave":""}">
+        <div><span class="tm">${vtime(s.video_time_s)}</span><span class="st">${esc(s.state)}</span></div>
+        ${s.note?`<div class="nt">${esc(s.note)}</div>`:""}
+      </div>`).join("")}</div>`
+    : empty("No state transitions recorded","This incident type does not run the hit-and-run state machine.");
+
+  const ev = d.evidence || {};
+  const shots = [
+    ["frame_before","Before"],["incident_frame","Impact"],
+    ["frame_after","After"],["vehicle_crop","Vehicle"],
+  ].filter(([k]) => ev[k]);
+  if(ident && ident.evidence_image) shots.push(["__plate","Plate"]);
+
+  const strip = shots.length ? `<div class="evidence-strip">${
+    shots.map(([k,l]) => {
+      const path = k === "__plate" ? ident.evidence_image : ev[k];
+      return `<figure><a href="/evidence/${encodeURI(path)}" target="_blank" rel="noopener">
+        <img loading="lazy" src="/evidence/${encodeURI(path)}" alt="${esc(l)}"></a>
+        <figcaption>${esc(l)}</figcaption></figure>`;
+    }).join("")
+    }${ev.clip ? `<figure><video src="/evidence/${encodeURI(ev.clip)}" controls muted></video>
+        <figcaption>Clip</figcaption></figure>` : ""}</div>`
+    : empty("No evidence frames stored","Evidence capture is switched off in the config for this run.");
+
+  return `<div class="detail">
+    <div class="grid" style="gap:12px">
+      ${card(`${title(i.event_type)} — investigation`, facts)}
+      ${card("Evidence", strip)}
+    </div>
+    <div class="grid" style="gap:12px">
+      ${card("State timeline", steps)}
+      ${card("Vehicle event history", table(
+        ["Time","Event","Conf","Detail"], d.related_events||[],
+        e => `<td class="mono">${clock(e.timestamp)}</td>
+              <td>${title(e.event_type)}</td>
+              <td class="num">${(+e.confidence||0).toFixed(2)}</td>
+              <td>${esc((meta(e).registration_number) || (meta(e).evidence||"").slice(0,48) || "–")}</td>`),
+        {pad:false})}
+    </div>
+  </div>`;
+}
+
+/* ---------------------------------------------- Hit-and-run */
+views.hitrun = async () => {
+  const rows = await api("/hit-and-run?limit=100");
+  if(!rows.length){
+    return card("Hit-and-run alerts", empty(
+      "No hit-and-run detected",
+      "This is the correct output for footage without a crash. A hit-and-run requires a "
+      + "confirmed collision followed by a sustained departure from the incident point — "
+      + "a vehicle merely disappearing never qualifies."));
+  }
+  const cards = rows.map((r,i) => {
+    const m = meta(r);
+    return `<div class="kpi crit" style="cursor:pointer" data-hr="${i}">
+      <div class="k">⛔ Hit-and-run · ${esc(m.status||"suspected")}${m.synthetic?' · <span class="tag synthetic">SYNTHETIC</span>':""}</div>
+      <div class="v" style="font-size:18px">${esc(m.registration_number || "plate pending")}</div>
+      <div class="n">track #${m.vehicle_track_id ?? r.track_id} · ${esc(r.class_name||"")}
+        · conf ${(+r.confidence||0).toFixed(2)} · ${stamp(r.timestamp)}</div>
+    </div>`;
+  }).join("");
+  return synthBanner(rows) + `<div class="kpis">${cards}</div>
+    <div id="hrDetail" style="margin-top:12px"></div>`;
+};
+views.hitrun.after = async () => {
+  const rows = await api("/hit-and-run?limit=100");
+  document.querySelectorAll("[data-hr]").forEach(el => {
+    el.onclick = () => openIncident(rows[+el.dataset.hr], "#hrDetail");
+  });
+  if(rows.length) openIncident(rows[0], "#hrDetail");
+};
+
+/* ---------------------------------------------- ANPR */
+views.anpr = async () => {
+  const [reads, vehicles] = await Promise.all([api("/anpr?limit=200"), api("/vehicles?limit=200")]);
+  const unknown = reads.filter(r => (meta(r).registration_number || "UNKNOWN") === "UNKNOWN").length;
+  const partial = reads.filter(r => meta(r).unverified_partial_read).length;
+  const confirmed = reads.length - unknown - partial;
+  return `<div class="kpis">
+      ${kpi("Plates attempted", reads.length, "one per identification request", "acc")}
+      ${kpi("Confirmed", confirmed, "above the confirmation threshold", "ok")}
+      ${kpi("Unverified partial", partial, "real OCR read, too weak to confirm", partial?"med":"")}
+      ${kpi("Reported UNKNOWN", unknown, "no readable text at all", unknown?"med":"")}
+      ${kpi("Vehicles on file", vehicles.length, "with an incident attached")}
+    </div>
+    <div style="margin-top:12px">
+    ${card("Identification results", table(
+      ["Time","Registration","Conf","Track","Class","Triggered by","Frames","Evidence"], reads,
+      r => { const m = meta(r); const plate = m.registration_number || "UNKNOWN";
+        const isUnknown = plate === "UNKNOWN";
+        const isPartial = !!m.unverified_partial_read;
+        const colour = isUnknown ? "var(--ink-3)" : isPartial ? "var(--medium)" : "var(--ink)";
+        const tag = isPartial ? ` <span style="font-size:9.5px;color:var(--medium);text-transform:uppercase;letter-spacing:.06em">unverified</span>` : "";
+        return `<td class="mono">${stamp(r.timestamp)}</td>
+          <td class="mono"><b style="color:${colour}">${esc(plate)}</b>${tag}</td>
+          <td class="num">${(+r.confidence||0).toFixed(2)}</td>
+          <td class="mono">#${r.track_id ?? "–"}</td>
+          <td>${esc(r.class_name||"–")}</td>
+          <td>${title(m.triggered_by_event_type||"–")}</td>
+          <td class="num">${m.frames_used ?? "–"}</td>
+          <td>${thumb(r.evidence_image,"plate")}</td>`; }), {pad:false,
+      right: [
+        partial ? `${partial} unverified partial read${partial>1?"s":""}` : "",
+        unknown ? `${unknown} shown as UNKNOWN` : "",
+      ].filter(Boolean).join(" · ")})}
+    </div>`;
+};
+
+/* ---------------------------------------------- Traffic */
+views.traffic = async () => {
+  const [rows, an, hm] = await Promise.all([
+    api("/traffic?limit=400"), api("/analytics"), api("/heatmap")]);
+  const obs = rows.filter(r => r.event_type === "traffic_observation");
+  const latest = obs[0] ? meta(obs[0]) : {};
+  const counts = obs.map(r => ({t: vtime(r.video_time_s), v: meta(r).vehicle_count}));
+  const density = obs.map(r => ({t: vtime(r.video_time_s), v: meta(r).density_percentage}));
+  const levels = {};
+  obs.forEach(r => { const l = meta(r).traffic_level || "LOW"; levels[l] = (levels[l]||0)+1; });
+
+  return `<div class="kpis">
+      ${kpi("Latest vehicle count", latest.vehicle_count, "in the last observation", "acc")}
+      ${kpi("Traffic level", latest.traffic_level || "–", `density ${pct(latest.density_percentage)}`,
+            latest.traffic_level==="CRITICAL"?"crit":latest.traffic_level==="HIGH"?"high":"ok")}
+      ${kpi("Congestion events", (an.events_by_type||{}).traffic_congestion || 0, "sustained over the threshold", "med")}
+      ${kpi("Bottlenecks", (an.events_by_type||{}).traffic_bottleneck || 0, "zone-level stalls")}
+      ${kpi("Unique vehicles", latest.unique_vehicles, "seen so far this run")}
+      ${kpi("Road segments", an.segments, "with traffic samples")}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+      ${card("Vehicle count per observation", lineChart(counts))}
+      ${card("Density %", lineChart(density, {unit:"%"}))}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);margin-top:12px">
+      ${card("Observations by traffic level", barChart(Object.entries(levels)))}
+      ${card("Road segments", table(
+        ["Segment","Samples","Avg vehicles","Avg density","Congested","Peak level","Incidents","Defects"],
+        (hm.segments||[]),
+        s => `<td class="mono">${esc(s.road_segment)}</td>
+              <td class="num">${s.samples}</td>
+              <td class="num">${num(s.avg_vehicle_count)}</td>
+              <td class="num">${pct(s.avg_density_percentage)}</td>
+              <td class="num">${pct((s.congested_ratio||0)*100)}</td>
+              <td>${esc(s.max_traffic_level||"–")}</td>
+              <td class="num">${s.incident_count||0}</td>
+              <td class="num">${s.defect_count||0}</td>`), {pad:false})}
+    </div>
+    <div style="margin-top:12px">
+    ${card("Congestion and bottleneck events", table(
+      ["Time","Type","Level","Vehicles","Duration","Delay","Bottleneck","Segment"],
+      rows.filter(r => r.event_type !== "traffic_observation"),
+      r => { const m = meta(r); return `
+        <td class="mono">${stamp(r.timestamp)}</td>
+        <td>${title(r.event_type)}</td>
+        <td>${esc(m.traffic_level||"–")}</td>
+        <td class="num">${num(m.vehicle_count)}</td>
+        <td class="num">${m.congestion_duration!=null?`${num(m.congestion_duration)}s`:"–"}</td>
+        <td class="num">${m.estimated_delay!=null?`${num(m.estimated_delay)} min`:"–"}</td>
+        <td class="num">${num(m.bottleneck_score)}</td>
+        <td class="mono">${esc(r.road_segment||"–")}</td>`; }), {pad:false})}
+    </div>`;
+};
+
+/* ---------------------------------------------- Road assets */
+let roadFilter = "all";
+views.road = async () => {
+  const rows = await api("/road-defects?limit=400");
+  const kinds = [...new Set(rows.map(r => r.class_name))].filter(Boolean).sort();
+  const shown = roadFilter === "all" ? rows : rows.filter(r => r.class_name === roadFilter);
+  const chips = [["all","All"], ...kinds.map(k => [k, title(k)])]
+    .map(([v,l]) => `<button class="btn ${roadFilter===v?"on":""}" data-r="${esc(v)}">${esc(l)}</button>`).join("");
+  const counts = {};
+  rows.forEach(r => counts[r.class_name] = (counts[r.class_name]||0)+1);
+
+  return `<div class="filters"><span class="lbl">Defect type</span>${chips}
+      <span class="lbl" style="margin-left:auto">${shown.length} of ${rows.length}</span></div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)">
+      ${card("Detections by class", barChart(Object.entries(counts).sort((a,b)=>b[1]-a[1])))}
+      ${card("Locations", `<div id="map"></div>`, {pad:false})}
+    </div>
+    <div style="margin-top:12px">
+    ${card("Road infrastructure register", table(
+      ["Time","Class","Severity","Conf","Issue","Priority","Department","Segment","Location","Evidence"], shown,
+      r => `<td class="mono">${stamp(r.timestamp)}</td>
+            <td>${title(r.class_name)}</td>
+            <td>${sev(r.severity)}</td>
+            <td class="num">${(+r.confidence||0).toFixed(2)}</td>
+            <td>${r.issue_id?`<span class="id">${esc(r.issue_id)}</span>`:"–"}</td>
+            <td class="num">${r.priority_score!=null?(+r.priority_score).toFixed(0):"–"}</td>
+            <td>${esc(r.department||"–")}</td>
+            <td class="mono">${esc(r.road_segment||"–")}</td>
+            <td class="mono">${gps(r)}</td>
+            <td>${thumb(r.evidence_image, r.class_name)}</td>`, {onclick:true}), {pad:false, right:"click a row to open its managed event"})}
+    </div>`;
+};
+views.road.after = async () => {
+  document.querySelectorAll("#view [data-r]").forEach(b => b.onclick = () => { roadFilter = b.dataset.r; render(); });
+  const rows = await api("/road-defects?limit=400");
+  const shown = roadFilter === "all" ? rows : rows.filter(r => r.class_name === roadFilter);
+  renderMap("map", eventMarkers(shown));
+  document.querySelectorAll("#view tbody tr.clickable").forEach(tr => {
+    tr.onclick = () => openCaseFor({event_id: shown[+tr.dataset.idx].event_id});
+  });
+};
+
+/* ---------------------------------------------- Issues */
+views.issues = async () => {
+  const rows = await api("/issues?limit=300");
+  return card("Persistent issues", table(
+    ["Issue","Type","Status","Severity","First seen","Last seen","Obs","Buses","Priority","Department"], rows,
+    i => `<td><span class="id">${esc(i.issue_id)}</span></td>
+          <td>${title(i.issue_type)}</td>
+          <td><span class="tag">${esc(i.status)}</span></td>
+          <td>${sev(i.severity)}</td>
+          <td class="mono">${stamp(i.first_seen)}</td>
+          <td class="mono">${stamp(i.last_seen)}</td>
+          <td class="num">${i.observation_count}</td>
+          <td class="num">${i.bus_count}</td>
+          <td class="num">${(+i.priority_score||0).toFixed(0)} <span class="tag">${esc(i.priority_band||"")}</span></td>
+          <td>${esc(i.department||"–")}</td>`,
+    {onclick:true}), {pad:false, right:`${rows.length} tracked`})
+    + `<div id="issueDetail" style="margin-top:12px"></div>`;
+};
+views.issues.after = async () => {
+  const rows = await api("/issues?limit=300");
+  document.querySelectorAll("tbody tr.clickable").forEach(tr => {
+    tr.onclick = async () => {
+      const issue = rows[+tr.dataset.idx];
+      const host = $("#issueDetail");
+      host.innerHTML = card("Issue detail", loading(3), {pad:false});
+      try{
+        const d = await api(`/issues/${encodeURIComponent(issue.issue_id)}`, {fresh:true});
+        host.innerHTML = `<div class="detail">
+          ${card(`${d.issue_id} — ${title(d.issue_type)}`, `<dl class="kv">
+            <dt>Status</dt><dd><span class="tag">${esc(d.status)}</span> ${sev(d.severity)}</dd>
+            <dt>Observed</dt><dd>${d.observation_count} times by ${d.bus_count} bus(es): ${esc((d.buses||[]).join(", "))}</dd>
+            <dt>First seen</dt><dd class="mono">${stamp(d.first_seen)}</dd>
+            <dt>Last seen</dt><dd class="mono">${stamp(d.last_seen)}</dd>
+            <dt>Clean passes</dt><dd>${d.clean_passes} (repair verification)</dd>
+            <dt>Reopened</dt><dd>${d.reopened_count} time(s)</dd>
+            <dt>Priority</dt><dd>${(+d.priority_score||0).toFixed(1)} · ${esc(d.priority_band||"")}</dd>
+            <dt>Routed to</dt><dd>${esc(d.department||"–")}</dd>
+            <dt>Managed event</dt><dd>${d.case_id ? `<a href="#" data-case="${esc(d.case_id)}"><b>${esc(d.case_id)}</b> · open evidence and workflow</a>` : "none (not actionable)"}</dd>
+            <dt>Location</dt><dd class="mono">${gps(d)} · ${esc(d.road_segment||"")}</dd>
+          </dl>`)}
+          ${card("Observation history", table(["Time","Bus","Conf","Evidence"], d.observations||[],
+            o => `<td class="mono">${stamp(o.timestamp)}</td><td class="mono">${esc(o.bus_id||"–")}</td>
+                  <td class="num">${(+o.confidence||0).toFixed(2)}</td><td>${thumb(o.evidence_image)}</td>`),
+            {pad:false})}
+        </div>`;
+      }catch(e){ host.innerHTML = card("Issue detail", errorBox(e)); }
+    };
+  });
+};
+
+/* ---------------------------------------------- Analytics */
+views.analytics = async () => {
+  const an = await api("/analytics");
+  const sevOrder = ["CRITICAL","HIGH","MEDIUM","LOW","INFO"];
+  const bySev = sevOrder.filter(s => (an.events_by_severity||{})[s])
+    .map(s => [s, an.events_by_severity[s]]);
+  return `<div class="kpis">
+      ${kpi("Events", an.events_total, "all modules", "acc")}
+      ${kpi("Issues", an.issues_total, "after deduplication")}
+      ${kpi("Segments", an.segments, "road segments observed")}
+      ${kpi("Buses reporting", Object.keys(an.events_by_bus||{}).length, "fleet coverage")}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+      ${card("Events by type", barChart(Object.entries(an.events_by_type||{}).sort((a,b)=>b[1]-a[1])))}
+      ${card("Events by severity", barChart(bySev, {color:"var(--high)"}))}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+      ${card("Issues routed to departments", table(["Department","Issues"],
+        Object.entries(an.issues_by_department||{}).sort((a,b)=>b[1]-a[1]),
+        r => `<td>${esc(r[0])}</td><td class="num">${r[1]}</td>`), {pad:false})}
+      ${card("Priority bands", table(["Band","Issues"],
+        Object.entries(an.issues_by_priority_band||{}),
+        r => `<td><span class="tag">${esc(r[0])}</span></td><td class="num">${r[1]}</td>`), {pad:false})}
+    </div>
+    <div style="margin-top:12px">
+      ${card("Events per bus", barChart(Object.entries(an.events_by_bus||{}).sort((a,b)=>b[1]-a[1])))}
+    </div>`;
+};
+
+/* ==================================================================
+   5b.  Multi-department platform
+        session · role identity · shared event workflow · new pages
+        Everything below reads the same backend the mobile app uses.
+   ================================================================== */
+let ME = null;                                   // {user, permissions} from /auth/me
+const role = () => ME ? ME.permissions.role : null;
+const isCentral = () => role() === "CENTRAL_COMMAND";
+const can = page => !!ME && (ME.permissions.pages || []).includes(page);
+
+const STATUSES = ["DETECTED","VERIFIED","ASSIGNED","IN_PROGRESS","RESOLVED"];
+const STATUS_SET = new Set(STATUSES);
+const STATUS_LABEL = {DETECTED:"Detected", VERIFIED:"Verified", ASSIGNED:"Assigned", IN_PROGRESS:"In progress", RESOLVED:"Resolved"};
+const NEXT_STEP = {DETECTED:"Verify", VERIFIED:"Assign", ASSIGNED:"Start work", IN_PROGRESS:"Mark resolved", RESOLVED:"Done"};
+const DEPT_COLOR = {CENTRAL_COMMAND:"#2F6FED", TRAFFIC_DEPARTMENT:"#B4740A", ROADS_INFRASTRUCTURE:"#D2622A",
+  PUBLIC_SAFETY:"#D93A3F", TRANSPORT_AUTHORITY:"#188556", FIELD_OFFICER:"#5B3CC4"};
+const DEPARTMENTS = [["ALL","All departments"],["TRAFFIC_DEPARTMENT","Traffic"],["ROADS_INFRASTRUCTURE","Roads & Infrastructure"],
+  ["PUBLIC_SAFETY","Public Safety"],["TRANSPORT_AUTHORITY","Transport"]];
+const DEPT_SHORT = {CENTRAL_COMMAND:"Central", TRAFFIC_DEPARTMENT:"Traffic", ROADS_INFRASTRUCTURE:"Roads",
+  PUBLIC_SAFETY:"Safety", TRANSPORT_AUTHORITY:"Transport"};
+const INFRA_OK = new Set(["zebra_crossing","divider","traffic_signboard","road_repair"]);
+const INCIDENT_KEYS = ["collision","possible_collision","hit_and_run","rash_driving","abnormal_movement","pedestrian_vehicle_risk"];
+
+const statusPill = s => `<span class="status-pill st-${esc(s)}">${esc(STATUS_LABEL[s] || title(s))}</span>`;
+function pipelineBar(status){
+  const i = STATUSES.indexOf(status);
+  return `<span class="pipeline ${status==="RESOLVED"?"done":""}" title="${esc(STATUS_LABEL[status]||status)}">${
+    STATUSES.map((_,k) => `<i class="${k<=i?"on":""}"></i>`).join("")}</span>`;
+}
+const routeLabel = id => (ME && (NAV_LABEL[role()]||{})[id]) || (ROUTES.find(r => r.id === id) || {}).label || title(id);
+const initials = n => String(n||"?").split(/\s+/).filter(Boolean).slice(0,2).map(w => w[0].toUpperCase()).join("");
+const confPct = c => (c === null || c === undefined) ? "–" : `${Math.round(+c * 100)}%`;
+function deptSelect(id, value){
+  return `<select class="btn" id="${id}">${DEPARTMENTS.map(([v,l]) =>
+    `<option value="${v}" ${v===value?"selected":""}>${esc(l)}</option>`).join("")}</select>`;
+}
+const deptName = d => (DEPARTMENTS.find(x => x[0] === d) || [d, d === "CENTRAL_COMMAND" ? "Central Command" : title(d)])[1];
+
+/* ---------------------------------------------- session */
+function showLogin(msg=""){
+  ME = null;
+  stopSync(); closeDrawer(); closeModal(); dropMaps();
+  mapLayersOn = null;
+  $("#login").classList.add("show");
+  const m = $("#loginMsg"); m.className = "loginmsg"; m.textContent = msg;
+  setTimeout(() => $("#loginUser").focus(), 60);
+}
+
+$("#loginForm").onsubmit = async ev => {
+  ev.preventDefault();
+  const btn = $("#loginBtn"), msg = $("#loginMsg");
+  btn.disabled = true; msg.className = "loginmsg"; msg.textContent = "Signing in…";
+  try{
+    const res = await fetch("/auth/login", {
+      method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({login:$("#loginUser").value.trim(), password:$("#loginPass").value, client:"web"}),
+    });
+    const j = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error(errText(j, `Login failed (${res.status})`));
+    ME = {user:j.user, permissions:j.permissions};
+    $("#loginPass").value = ""; msg.textContent = "";
+    $("#login").classList.remove("show");
+    clearCache();
+    history.replaceState(null, "", "#" + ME.permissions.home);      // the role's own dashboard
+    await boot();
+    toast(`Signed in as ${ME.user.name}`, ME.user.role_label, "ok");
+  }catch(e){
+    msg.className = "loginmsg err"; msg.textContent = e.message;
+  }finally{ btn.disabled = false; }
+};
+
+$("#forgotLink").onclick = async ev => {
+  ev.preventDefault();
+  const login = $("#loginUser").value.trim(), msg = $("#loginMsg");
+  if(!login){ msg.className = "loginmsg err"; msg.textContent = "Enter your email or username first."; return; }
+  try{
+    const res = await fetch("/auth/forgot-password", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({login})});
+    const j = await res.json().catch(() => ({}));
+    msg.className = res.ok ? "loginmsg" : "loginmsg err";
+    msg.textContent = res.ok ? j.message : errText(j, "Could not send the request");
+  }catch(e){ msg.className = "loginmsg err"; msg.textContent = e.message; }
+};
+
+$("#logoutBtn").onclick = async () => {
+  try{ await fetch("/auth/logout", {method:"POST", credentials:"same-origin"}); }catch(_){}
+  clearCache();
+  showLogin("You have been logged out.");
+};
+$("#bellBtn").onclick = () => { location.hash = "#notifications"; };
+$("#pwBtn").onclick = () => openModal("Change password", `
+    <div class="field"><label>Current password</label><input class="input" type="password" id="pwCur" autocomplete="current-password"></div>
+    <div class="field"><label>New password (8+ characters)</label><input class="input" type="password" id="pwNew" autocomplete="new-password"></div>
+    <div class="field"><label>Repeat new password</label><input class="input" type="password" id="pwRep" autocomplete="new-password"></div>`,
+  async () => {
+    if($("#pwNew").value !== $("#pwRep").value) throw new Error("The new passwords do not match.");
+    await post("/auth/change-password", {current_password:$("#pwCur").value, new_password:$("#pwNew").value});
+    showLogin("Password changed. Log in with the new password.");
+  }, "Change password");
+
+function applyIdentity(){
+  const p = ME.permissions, u = ME.user;
+  document.documentElement.style.setProperty("--dept", DEPT_COLOR[p.role] || "#2F6FED");
+  const label = p.role === "CENTRAL_COMMAND" ? "Command Center"
+    : p.role === "FIELD_OFFICER" ? `Field Officer · ${DEPT_SHORT[p.department] || ""}` : p.department_label;
+  $(".brand span").textContent = label;
+  document.title = `Urban Intelligence · ${label}`;
+  $("#userChip").innerHTML = `<span class="avatar">${esc(initials(u.name))}</span>
+    <span class="who"><b>${esc(u.name)}</b><span>${esc(u.role_label)}</span></span>`;
+  $("#sideFoot").textContent = u.email;
+}
+
+async function boot(){
+  applyIdentity();
+  buildNav();
+  await refreshHealth().catch(() => {});
+  await render();
+  startSync();
+}
+
+/* ---------------------------------------------- live sync with the mobile app
+   GET /sync/state is a cheap change token (cases, activity, notifications,
+   observations, events).  When a field officer resolves EV-1024 on a phone
+   the token changes and this page re-reads what it is showing. */
+let syncTimer = null, syncToken = null, lastUnread = null;
+const LIVE_VIEWS = new Set(["dashboard","events","evidence","notifications","traffic_home","roads_home",
+  "safety_home","transport_home","field_home"]);
+function startSync(){ stopSync(); syncTimer = setInterval(pollSync, 8000); pollSync(); }
+function stopSync(){ if(syncTimer) clearInterval(syncTimer); syncTimer = null; syncToken = null; lastUnread = null; }
+function setUnread(n){
+  const b = $("#bellCount");
+  b.hidden = !n; b.textContent = n > 99 ? "99+" : String(n || "");
+  if(navCounts.unread !== n){ navCounts.unread = n; buildNav(); }
+}
+async function pollSync(){
+  if(!ME || document.hidden) return;
+  try{
+    const st = await api("/sync/state", {fresh:true});
+    if(lastUnread !== null && st.unread > lastUnread) toast("New notification", "Open the bell to read it.", "");
+    lastUnread = st.unread;
+    setUnread(st.unread);
+    if(syncToken !== null && st.token !== syncToken){
+      clearCache();
+      refreshHealth().catch(() => {});
+      const a = document.activeElement;
+      const typing = a && ["INPUT","SELECT","TEXTAREA"].includes(a.tagName) && $("#view").contains(a);
+      if(LIVE_VIEWS.has(current()) && !typing) render({quiet:true});
+      if(drawerCase) openCase(drawerCase, {quiet:true});
+    }
+    syncToken = st.token;
+  }catch(_){ /* offline for a moment: the next poll retries */ }
+}
+document.addEventListener("visibilitychange", () => { if(!document.hidden) pollSync(); });
+
+/* ---------------------------------------------- modal */
+let modalAction = null;
+function openModal(heading, html, onOk, okLabel="OK"){
+  $("#modalTitle").textContent = heading;
+  $("#modalBody").innerHTML = html;
+  $("#modalMsg").textContent = "";
+  $("#modalOk").textContent = okLabel;
+  modalAction = onOk;
+  $("#modal").classList.add("show");
+  const f = $("#modalBody").querySelector("input,select,textarea");
+  if(f) setTimeout(() => f.focus(), 40);
+}
+function closeModal(){ $("#modal").classList.remove("show"); modalAction = null; }
+$("#modalCancel").onclick = closeModal;
+$("#modalOk").onclick = async () => {
+  if(!modalAction){ closeModal(); return; }
+  const btn = $("#modalOk"); btn.disabled = true;
+  try{ await modalAction(); closeModal(); }
+  catch(e){ $("#modalMsg").textContent = e.message; }
+  finally{ btn.disabled = false; }
+};
+
+/* ---------------------------------------------- event drawer (EV-xxxx) */
+let drawerCase = null, drawerTab = null, drawerForm = false;
+
+function closeDrawer(){
+  const v = $("#drawerBody video"); if(v) v.pause();
+  drawerCase = null; drawerForm = false;
+  document.body.classList.remove("drawer-open");
+}
+$("#drawerClose").onclick = closeDrawer;
+$("#drawerMask").onclick = closeDrawer;
+document.addEventListener("keydown", e => {
+  if(e.key !== "Escape") return;
+  if($("#modal").classList.contains("show")) closeModal(); else closeDrawer();
+});
+// Any element carrying data-case opens that managed event: table rows,
+// map popups, gallery cards, notification links.
+document.addEventListener("click", e => {
+  const el = e.target.closest && e.target.closest("[data-case]");
+  if(!el || e.target.closest("select,button[data-act]")) return;
+  e.preventDefault();
+  openCase(el.getAttribute("data-case"));
+});
+
+async function openCase(caseId, {quiet=false}={}){
+  if(!caseId) return;
+  const same = drawerCase === caseId;
+  if(!same){ drawerTab = null; drawerForm = false; }
+  drawerCase = caseId;
+  document.body.classList.add("drawer-open");
+  const body = $("#drawerBody");
+  if(quiet){
+    const v = body.querySelector("video");
+    if(drawerForm || (v && !v.paused)) return;       // never yank a form or a playing video
+  }else if(!same){
+    $("#drawerTitle").textContent = caseId;
+    body.innerHTML = card(" ", loading(6), {pad:false});
+  }
+  try{
+    const d = await api(`/cases/${encodeURIComponent(caseId)}`, {fresh:true});
+    if(drawerCase !== caseId) return;
+    showCase(d);
+  }catch(e){
+    if(drawerCase === caseId) body.innerHTML = card("Event", errorBox(e));
+  }
+}
+
+function showCase(d){
+  $("#drawerTitle").textContent = `${d.case_id} · ${d.title}`;
+  $("#drawerBody").innerHTML = caseHtml(d);
+  wireCase(d);
+}
+
+async function openCaseFor({issue_id=null, event_id=null}){
+  const q = issue_id ? `issue_id=${encodeURIComponent(issue_id)}` : `event_id=${encodeURIComponent(event_id)}`;
+  try{
+    const r = await api(`/cases/lookup?${q}`, {fresh:true});
+    openCase(r.case_id);
+  }catch(e){
+    toast("No managed event for this record",
+      e.status === 404 ? "Healthy infrastructure and informational records are not cases." : e.message);
+  }
+}
+
+function evidenceTabs(ev){
+  const tabs = [];
+  if(ev.frame_url) tabs.push(["frame","View detection frame"]);
+  if(ev.video) tabs.push(["video","Play evidence video"]);
+  if(ev.detection_image) tabs.push(["crop","Detection crop"]);
+  if((ev.incident_frames || []).length) tabs.push(["frames","Incident frames"]);
+  if(ev.clip) tabs.push(["clip","Incident clip"]);
+  return tabs;
+}
+
+function evidenceMain(d, tab){
+  const ev = d.evidence || {}, v = ev.video;
+  if(!ev.available) return empty("No evidence stored", "This event has no linked detection record.");
+  if(tab === "frame" && v) return `<div class="evidence-main">
+      <a href="${esc(ev.frame_url)}" target="_blank" rel="noopener"><img src="${esc(ev.frame_url)}" alt="annotated detection frame"></a></div>
+    <div class="evcap">Frame ${v.frame_index} of <span class="mono">${esc(v.name)}</span> at ${vtime(v.event_time_s)}.
+      The box and label were drawn by the pipeline at inference time; nothing is redrawn here.</div>`;
+  if(tab === "video" && v) return `<div class="evidence-main">
+      <video id="evVideo" controls playsinline preload="metadata" src="${esc(v.url)}"></video></div>
+    <div class="evcap">Annotated recording <span class="mono">${esc(v.name)}</span>, opened at ${vtime(v.start_s)}.
+      The event is at <a href="#" id="evJump">${vtime(v.event_time_s)} (frame ${v.frame_index}), click to pause on it</a>.
+      ${v.link_method === "matched" ? `Linked by matching the stored detection crop (score ${(+v.match_score).toFixed(2)}).`
+        : v.link_method === "run_id" ? "Linked by the run id stamped on the event." : "Linked by frame and time consistency."}</div>`;
+  if(tab === "crop") return `<div class="evidence-main" style="padding:10px">
+      <img src="${esc(ev.detection_image)}" alt="detection crop" style="max-height:300px"></div>
+    <div class="evcap">Crop saved by the module when it raised the event${ev.bounding_box ? `, bounding box [${ev.bounding_box.join(", ")}]` : ""}.</div>`;
+  if(tab === "frames") return `<div class="evidence-strip">${ev.incident_frames.map(f =>
+      `<figure><a href="${esc(f.url)}" target="_blank" rel="noopener"><img src="${esc(f.url)}" alt="${esc(f.label)}"></a>
+       <figcaption>${esc(f.label)}</figcaption></figure>`).join("")}</div>`;
+  if(tab === "clip") return `<div class="evidence-main"><video controls playsinline preload="metadata" src="${esc(ev.clip)}"></video></div>
+    <div class="evcap">Short clip saved by the incident module. Some browsers cannot play its codec; the annotated recording always plays.</div>`;
+  return empty("No annotated recording or crop is linked",
+    "The recording may have been deleted, or it predates run ids and could not be matched safely.");
+}
+
+function caseHtml(d){
+  const ev = d.evidence || {};
+  const idx = STATUSES.indexOf(d.status);
+  const at = {DETECTED:d.first_seen, VERIFIED:d.verified_at, ASSIGNED:d.assigned_at, IN_PROGRESS:d.started_at, RESOLVED:d.resolved_at};
+  const stepper = `<div class="stepper">${STATUSES.map((st,k) => {
+    const cls = (k < idx || d.status === "RESOLVED") ? "done" : k === idx ? "current" : "";
+    return `<div class="step ${cls}">${STATUS_LABEL[st]}<small>${k <= idx && at[st] ? esc(clock(at[st])) : "&nbsp;"}</small></div>`;
+  }).join("")}</div>`;
+
+  const acts = d.allowed_actions || [];
+  const buttons = acts.map(a => {
+    const cls = a.enabled ? (a.action === "resolve" ? "good" : "primary") : "";
+    const tip = a.reason || (a.done ? "already done" : `available once the event is ${STATUS_LABEL[STATUSES[STATUSES.indexOf(a.to_status)-1]] || ""}`);
+    return `<button class="btn ${cls}" data-act="${a.action}" ${a.enabled ? "" : "disabled"} title="${esc(tip)}">${
+      a.done && !a.reassign ? "&#10003; " : ""}${esc((a.reassign ? "Reassign" : a.label).toUpperCase())}</button>`;
+  }).join("");
+  let note = "";
+  if(!d.can_act){
+    const blocked = acts.find(a => a.reason);
+    note = d.status === "RESOLVED"
+      ? `<div class="viewonly" style="margin-top:8px">Resolved. It re-opens automatically if a bus detects it again.</div>`
+      : `<div class="viewonly" style="margin-top:8px">${esc(blocked ? blocked.reason : `View only: ${d.owner_department_label} acts on this event.`)}</div>`;
+  }
+
+  const tabs = evidenceTabs(ev);
+  if(!drawerTab || !tabs.some(t => t[0] === drawerTab)) drawerTab = tabs.length ? tabs[0][0] : null;
+  const plate = ev.plate ? `<div style="margin-top:12px"><span class="lbl" style="font-size:10px;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase">Registration (ANPR)</span><br>
+      <span class="plate">${esc(ev.plate.registration_number)}</span>
+      ${ev.plate.confidence != null ? `<span class="mono" style="margin-left:8px">${confPct(ev.plate.confidence)}</span>` : ""}
+      ${ev.plate.unverified ? `<span class="tag suspected">unverified partial read</span>` : ""}</div>` : "";
+  const evidence = `${tabs.length ? `<div class="evtabs">${tabs.map(([k,l]) =>
+      `<button class="btn ${k === drawerTab ? "on" : ""}" data-evtab="${k}">${esc(l.toUpperCase())}</button>`).join("")}</div>` : ""}
+    <div id="evMain">${evidenceMain(d, drawerTab)}</div>${plate}`;
+
+  const facts = `<dl class="kv">
+    <dt>Event ID</dt><dd><span class="id">${esc(d.case_id)}</span></dd>
+    <dt>Type</dt><dd>${esc(d.event_type === "road_defect" ? title(d.class_name || "road defect") : title(d.event_type))}</dd>
+    <dt>Location</dt><dd class="mono">${gps(d)}${d.road_segment ? `<br>${esc(d.road_segment)}` : ""}</dd>
+    <dt>Bus</dt><dd class="mono">${esc(ev.bus_id || d.bus_id || "–")}${d.bus_count > 1 ? ` (+${d.bus_count - 1} more)` : ""}</dd>
+    <dt>Camera</dt><dd class="mono">${esc(ev.camera_id || d.camera_id || "–")}</dd>
+    <dt>Confidence</dt><dd>${confPct(ev.confidence ?? d.confidence)} · ${sev(d.severity)}</dd>
+    <dt>Timestamp</dt><dd class="mono">${stamp(ev.timestamp || d.first_seen)}${ev.video_time_s != null ? `<br>video ${vtime(ev.video_time_s)}, frame ${ev.frame_number}` : ""}</dd>
+    ${d.priority_score != null ? `<dt>Priority</dt><dd>${(+d.priority_score).toFixed(0)} · ${esc(d.priority_band || "")}</dd>` : ""}
+    <dt>Sightings</dt><dd>${d.observation_count} by ${esc((d.buses || []).join(", ") || "–")}<br>
+      <span style="color:var(--ink-3)">grouped from ${esc((d.issues || []).join(", "))}</span></dd>
+    <dt>Department</dt><dd>${esc(d.owner_department_label)}</dd>
+    <dt>Assignee</dt><dd>${esc(d.assignee_name || "unassigned")}</dd>
+    ${d.resolution_note ? `<dt>Resolution</dt><dd><i>${esc(d.resolution_note)}</i></dd>` : ""}
+    ${ev.event_id ? `<dt>Detection</dt><dd class="mono" style="color:var(--ink-3)">${esc(ev.event_id)}</dd>` : ""}
+    ${ev.model ? `<dt>Detector</dt><dd class="mono">${esc(ev.model)}</dd>` : ""}
+  </dl>`;
+
+  const activity = (d.activity || []).length ? `<div class="timeline">${d.activity.map(a => `
+      <div class="tstep ${a.action === "REOPENED" ? "hit" : a.action === "RESOLVED" ? "" : ""}">
+        <div><span class="tm">${esc(stamp(a.at))}</span><span class="st">${esc(a.action)}</span></div>
+        <div class="nt">${esc(a.note || "")}</div></div>`).join("")}</div>`
+    : empty("No activity yet", "");
+
+  const obs = table(["Time","Bus","Camera","Conf","Frame","Crop"], d.observations || [], o => `
+      <td class="mono">${stamp(o.timestamp)}</td><td class="mono">${esc(o.bus_id || "–")}</td>
+      <td class="mono">${esc(o.camera_id || "–")}</td><td class="num">${confPct(o.confidence)}</td>
+      <td class="num">${o.frame_number ?? "–"}</td><td>${thumb(o.evidence_image)}</td>`);
+
+  return `<div class="card"><div class="body">
+      <div class="casehead">
+        <div class="k" style="color:${DEPT_COLOR[d.owner_department] || "var(--ink-3)"}">${esc((d.category || "Event").toUpperCase())}</div>
+        <h2>${esc(d.title)} <span class="id">${esc(d.case_id)}</span></h2>
+        <div class="row" style="gap:6px">${statusPill(d.status)} ${sev(d.severity)}
+          <span class="tag">${esc(d.owner_department_label)}</span>
+          ${d.reopened_count ? `<span class="tag suspected">re-opened ${d.reopened_count}x</span>` : ""}
+          ${ev.synthetic ? `<span class="tag synthetic">SYNTHETIC</span>` : ""}</div>
+      </div>
+      ${stepper}
+      <div class="actions">${buttons}</div>${note}
+      <div id="actForm"></div>
+    </div></div>
+    ${card("Evidence", evidence)}
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+      ${card("Event details", facts)}
+      ${card("Activity log", activity)}
+    </div>
+    ${card("Observations grouped into this event", obs, {pad:false, right:`${d.observation_count} total`})}`;
+}
+
+// The middle of the event frame's display interval.  Seeking to exactly
+// frame/fps lands on a boundary and shows the neighbour, and the pipeline
+// only draws a defect box on the frames its model actually ran on.
+const frameTime = vid => (vid.frame_index != null && vid.fps) ? (vid.frame_index + 0.5) / vid.fps : vid.event_time_s;
+function wireVideo(d){
+  const v = $("#evVideo"), vid = (d.evidence || {}).video;
+  if(!v || !vid) return;
+  v.addEventListener("loadedmetadata", () => { v.currentTime = Math.max(0, vid.start_s); }, {once:true});
+  const j = $("#evJump");
+  if(j) j.onclick = e => { e.preventDefault(); v.pause(); v.currentTime = frameTime(vid); };
+}
+
+function wireCase(d){
+  const body = $("#drawerBody");
+  body.querySelectorAll("[data-evtab]").forEach(b => b.onclick = () => {
+    const v = $("#evVideo"); if(v) v.pause();
+    drawerTab = b.dataset.evtab;
+    body.querySelectorAll("[data-evtab]").forEach(x => x.classList.toggle("on", x === b));
+    $("#evMain").innerHTML = evidenceMain(d, drawerTab);
+    wireVideo(d);
+  });
+  wireVideo(d);
+  body.querySelectorAll("[data-act]").forEach(b => b.onclick = () => startAction(d, b.dataset.act));
+}
+
+async function startAction(d, action){
+  const host = $("#actForm");
+  if(action === "verify" || action === "start") return doTransition(d, action);
+  drawerForm = true;
+  if(action === "assign"){
+    host.innerHTML = `<div class="actform">${loading(2)}</div>`;
+    try{
+      const people = await api(`/cases/${encodeURIComponent(d.case_id)}/assignees`, {fresh:true});
+      if(!people.length) throw new Error("Nobody active in the responsible department can take this event.");
+      host.innerHTML = `<div class="actform">
+        <div class="field"><label>Assign ${esc(d.case_id)} to</label>
+          <select class="input" id="assignWho">${people.map(p =>
+            `<option value="${esc(p.user_id)}" ${p.user_id === d.assignee_user_id ? "selected" : ""}>${esc(p.name)} · ${esc(p.role_label)} · ${p.open_tasks} open</option>`).join("")}</select></div>
+        <div class="field"><label>Note (optional)</label><input class="input" id="actNote" maxlength="500"></div>
+        <div class="actions"><button class="btn primary" id="actOk">CONFIRM ASSIGNMENT</button><button class="btn" id="actCancel">Cancel</button></div></div>`;
+      $("#actOk").onclick = () => doTransition(d, "assign", {assignee_user_id:$("#assignWho").value, note:$("#actNote").value});
+    }catch(e){ host.innerHTML = `<div class="actform">${errorBox(e)}</div>`; drawerForm = false; }
+  }else if(action === "resolve"){
+    host.innerHTML = `<div class="actform">
+      <div class="field"><label>Resolution note (what was done)</label><textarea class="input" id="actNote" maxlength="500"></textarea></div>
+      <div class="actions"><button class="btn good" id="actOk">CONFIRM RESOLVED</button><button class="btn" id="actCancel">Cancel</button></div></div>`;
+    $("#actOk").onclick = () => doTransition(d, "resolve", {note:$("#actNote").value});
+  }
+  const c = $("#actCancel");
+  if(c) c.onclick = () => { host.innerHTML = ""; drawerForm = false; };
+}
+
+async function doTransition(d, action, extra={}){
+  $("#drawerBody").querySelectorAll("[data-act], #actOk").forEach(b => b.disabled = true);
+  try{
+    const out = await post(`/cases/${encodeURIComponent(d.case_id)}/transition`,
+      {action, expected_status:d.status, ...extra});
+    drawerForm = false;
+    toast(`${out.case_id} is now ${STATUS_LABEL[out.status]}`, "Saved to the shared backend; web and mobile both see it.", "ok");
+    showCase(out);
+    render({quiet:true});
+    pollSync();
+  }catch(e){
+    drawerForm = false;
+    toast("Update not applied", e.message, "err");
+    openCase(d.case_id);
+  }
+}
+
+/* ---------------------------------------------- shared table of managed events */
+function casesTable(rows, {dept=isCentral(), compact=false, note=""}={}){
+  if(!rows.length) return empty("No events here", note || "Managed events are created from the pipeline's deduplicated detections.");
+  return `<div class="tablewrap"><table><thead><tr>
+    <th>Event</th><th>Type</th><th>Status</th><th>Severity</th>${compact ? "" : "<th>Priority</th>"}
+    ${dept ? "<th>Department</th>" : ""}<th>Bus</th><th>Obs</th><th>Assignee</th><th>Last seen</th>${compact ? "" : "<th>Evidence</th>"}
+    </tr></thead><tbody>${rows.map(c => `<tr class="clickable" data-case="${esc(c.case_id)}">
+      <td><span class="id">${esc(c.case_id)}</span></td>
+      <td>${esc(c.title)}</td>
+      <td>${statusPill(c.status)} ${pipelineBar(c.status)}</td>
+      <td>${sev(c.severity)}</td>
+      ${compact ? "" : `<td class="num">${c.priority_score != null ? (+c.priority_score).toFixed(0) : "–"}</td>`}
+      ${dept ? `<td>${esc(DEPT_SHORT[c.owner_department] || c.owner_department)}</td>` : ""}
+      <td class="mono">${esc(c.bus_id || "–")}${c.bus_count > 1 ? ` +${c.bus_count - 1}` : ""}</td>
+      <td class="num">${c.observation_count}</td>
+      <td>${esc(c.assignee_name || "–")}</td>
+      <td class="mono">${stamp(c.last_seen)}</td>
+      ${compact ? "" : `<td>${c.thumbnail ? `<img class="thumb" loading="lazy" src="${esc(c.thumbnail)}" alt="">`
+        : `<span class="tag">${c.recording_name ? "video" : "none"}</span>`}</td>`}
+    </tr>`).join("")}</tbody></table></div>`;
+}
+
+function evidenceGallery(rows, limit=8){
+  const items = rows.filter(c => c.thumbnail || c.recording_name).slice(0, limit);
+  if(!items.length) return empty("No evidence yet", "Evidence appears when a detection is linked to its annotated recording or crop.");
+  return `<div class="gallery">${items.map(c => `<div class="gcard" data-case="${esc(c.case_id)}">
+      <div class="img">${c.thumbnail ? `<img loading="lazy" src="${esc(c.thumbnail)}" alt="">` : "annotated video only"}</div>
+      <div class="meta"><b>${esc(c.title)} <span class="id">${esc(c.case_id)}</span></b>
+        <span>${statusPill(c.status)} ${sev(c.severity)}</span>
+        <span class="mono">${esc(c.bus_id || "–")} / ${esc(c.camera_id || "–")} · ${confPct(c.confidence)}</span>
+        <span class="mono">${stamp(c.last_seen)}${c.recording_name ? " · &#9654; video" : ""}</span></div></div>`).join("")}</div>`;
+}
+
+/* ---------------------------------------------- Event Management */
+const EV = {status:"open", dept:"ALL", type:"", assigned:"", q:""};
+views.events = async () => {
+  const qs = new URLSearchParams({limit:"400"});
+  if(EV.status === "open") qs.set("open_only", "true");
+  else if(EV.status !== "all") qs.set("status", EV.status);
+  if(isCentral() && EV.dept !== "ALL") qs.set("department", EV.dept);
+  if(EV.type){ const [k, v] = EV.type.split(":"); qs.set(k === "c" ? "class_name" : "event_type", v); }
+  if(EV.assigned) qs.set("assigned", EV.assigned);
+  if(EV.q) qs.set("q", EV.q);
+  const [sum, data] = await Promise.all([api("/cases/summary"), api(`/cases?${qs}`)]);
+  const byType = sum.by_type || {};
+  const typeOpts = [
+    ...Object.keys(byType).filter(t => t !== "road_defect").map(t => [`t:${t}`, title(t)]),
+    ...Object.keys(sum.by_class || {}).filter(k => !(k in byType)).map(c => [`c:${c}`, title(c)]),
+  ];
+  const chips = [["open","All open"],["all","Everything"], ...STATUSES.map(st => [st, STATUS_LABEL[st]])].map(([v,l]) =>
+    `<button class="btn ${EV.status === v ? "on" : ""}" data-evs="${v}">${esc(l)}${STATUS_SET.has(v)
+      ? ` <span class="mono" style="opacity:.7">${sum.by_status[v] || 0}</span>` : ""}</button>`).join("");
+  return `<div class="kpis">
+      ${kpi("Open events", sum.open, `${sum.total} managed in total`, "acc")}
+      ${kpi("Critical open", sum.critical_open, "critical severity or priority", sum.critical_open ? "crit" : "ok")}
+      ${kpi("Awaiting assignment", sum.unassigned_open, "open, nobody assigned", sum.unassigned_open ? "med" : "")}
+      ${kpi(role() === "FIELD_OFFICER" ? "My open tasks" : "Assigned to me", sum.assigned_to_me_open, "open")}
+      ${kpi("In progress", sum.by_status.IN_PROGRESS || 0, "work started")}
+      ${kpi("Resolved (24 h)", sum.resolved_24h, "closed in the last day", "ok")}
+    </div>
+    <div class="filters" style="margin-top:12px"><span class="lbl">Status</span>${chips}</div>
+    <div class="filters">
+      ${isCentral() ? `<span class="lbl">Department</span>${deptSelect("evDept", EV.dept)}` : ""}
+      <span class="lbl">Type</span><select class="btn" id="evType"><option value="">All types</option>${typeOpts.map(([v,l]) =>
+        `<option value="${esc(v)}" ${EV.type === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
+      <span class="lbl">Assigned</span><select class="btn" id="evAssigned">${[["","Anyone"],["me","Me"],["unassigned","Unassigned"]].map(([v,l]) =>
+        `<option value="${v}" ${EV.assigned === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <input type="search" id="evQ" placeholder="Search EV id, type, segment, bus" value="${esc(EV.q)}">
+      <span class="lbl" style="margin-left:auto">${data.total} matching</span>
+    </div>
+    ${card(routeLabel("events"), casesTable(data.items), {pad:false, right:"click a row for evidence and actions"})}`;
+};
+views.events.after = () => {
+  document.querySelectorAll("#view [data-evs]").forEach(b => b.onclick = () => { EV.status = b.dataset.evs; render(); });
+  [["evDept","dept"],["evType","type"],["evAssigned","assigned"]].forEach(([id, key]) => {
+    const el = $("#" + id); if(el) el.onchange = () => { EV[key] = el.value; render(); };
+  });
+  const q = $("#evQ");
+  if(q){
+    let timer;
+    q.oninput = () => { clearTimeout(timer); timer = setTimeout(async () => {
+      EV.q = q.value.trim(); await render();
+      const n = $("#evQ"); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+    }, 350); };
+  }
+};
+
+/* ---------------------------------------------- Evidence */
+const EVD = {dept:"ALL", open:false};
+views.evidence = async () => {
+  const qs = new URLSearchParams({limit:"300", sort:"recent"});
+  if(isCentral() && EVD.dept !== "ALL") qs.set("department", EVD.dept);
+  if(EVD.open) qs.set("open_only", "true");
+  const data = await api(`/cases?${qs}`);
+  const items = data.items.filter(c => c.thumbnail || c.recording_name);
+  return `<div class="filters">
+      ${isCentral() ? `<span class="lbl">Department</span>${deptSelect("evdDept", EVD.dept)}` : ""}
+      <span class="lbl">Show</span>
+      <button class="btn ${!EVD.open ? "on" : ""}" data-evd="all">All</button>
+      <button class="btn ${EVD.open ? "on" : ""}" data-evd="open">Open only</button>
+      <span class="lbl" style="margin-left:auto">${items.length} events with evidence</span></div>
+    ${items.length ? evidenceGallery(items, 300) : card("Evidence", evidenceGallery([]))}`;
+};
+views.evidence.after = () => {
+  document.querySelectorAll("#view [data-evd]").forEach(b => b.onclick = () => { EVD.open = b.dataset.evd === "open"; render(); });
+  const d = $("#evdDept"); if(d) d.onchange = () => { EVD.dept = d.value; render(); };
+};
+
+/* ---------------------------------------------- Notifications */
+const NT = {dept:""};
+views.notifications = async () => {
+  const q = isCentral() && NT.dept ? `&department=${NT.dept}` : "";
+  const data = await api(`/notifications?limit=200${q}`, {fresh:true});
+  setUnread(data.unread);
+  const rows = data.items;
+  const list = rows.length ? rows.map(n => `<div class="notif ${n.read ? "" : "unread"}">
+      <div class="bar ${esc(n.severity || "INFO")}"></div>
+      <div class="x"><b>${n.read ? "" : `<span class="udot"></span>`}${esc(n.title)}</b><span>${esc(n.body || "")}</span>
+        <div style="margin-top:5px">${n.department ? `<span class="tag">${esc(n.department_label)}</span>` : `<span class="tag">personal</span>`}
+          <span class="tag state">${esc(n.kind || "")}</span> ${sev(n.severity)}</div></div>
+      <div style="text-align:right">
+        <div class="when">${stamp(n.created_at)}</div>
+        ${n.case_id ? `<button class="btn" style="margin-top:6px" data-nopen="${n.id}" data-ncase="${esc(n.case_id)}">Open ${esc(n.case_id)}</button>`
+          : (!n.read ? `<button class="btn" style="margin-top:6px" data-nread="${n.id}">Mark read</button>` : "")}
+      </div></div>`).join("")
+    : empty("No notifications", "New events for your department and assignments to you appear here, on web and mobile.");
+  const scopeSel = isCentral() ? `<span class="lbl">Showing</span><select class="btn" id="ntDept">
+      ${[["","My inbox"], ...DEPARTMENTS].map(([v,l]) => `<option value="${v}" ${NT.dept === v ? "selected" : ""}>${esc(v === "ALL" ? "Every department" : l)}</option>`).join("")}</select>` : "";
+  return `<div class="filters">${scopeSel}
+      <span class="lbl" style="margin-left:auto">${data.unread} unread</span>
+      <button class="btn" id="ntAll" ${data.unread ? "" : "disabled"}>Mark all read</button></div>
+    ${card("Notifications", list, {pad:false, right:`${rows.length} shown`})}`;
+};
+views.notifications.after = () => {
+  const d = $("#ntDept"); if(d) d.onchange = () => { NT.dept = d.value; render(); };
+  const all = $("#ntAll");
+  if(all) all.onclick = async () => { const r = await post("/notifications/read", {ids:null}); setUnread(r.unread); render({quiet:true}); };
+  document.querySelectorAll("#view [data-nread]").forEach(b => b.onclick = async () => {
+    const r = await post("/notifications/read", {ids:[+b.dataset.nread]}); setUnread(r.unread); render({quiet:true});
+  });
+  document.querySelectorAll("#view [data-nopen]").forEach(b => b.onclick = async () => {
+    openCase(b.dataset.ncase);
+    const r = await post("/notifications/read", {ids:[+b.dataset.nopen]}); setUnread(r.unread); render({quiet:true});
+  });
+};
+
+/* ---------------------------------------------- Fleet */
+const BUS_STATE_CLS = {REPORTING:"confirmed", IDLE:"", NO_REPORTS:"", MAINTENANCE:"suspected", OUT_OF_SERVICE:"suspected"};
+const busState = s => `<span class="tag ${BUS_STATE_CLS[s] || ""}">${esc(title(String(s || "").toLowerCase()))}</span>`;
+const km = m => m == null ? "–" : `${(m / 1000).toFixed(m < 10000 ? 2 : 1)} km`;
+
+function busTable(f, editable){
+  return table(["Bus","Route","Depot","Service","State","Last report","Position","Events","Open events","Trips","Distance"], f.buses, b => `
+    <td><span class="id">${esc(b.bus_id)}</span></td>
+    <td>${esc(b.route_name || b.route_id || "–")}</td>
+    <td>${esc(b.depot || "–")}</td>
+    <td>${editable ? `<select class="btn" data-busstatus="${esc(b.bus_id)}">${(f.service_statuses || []).map(st =>
+        `<option ${st === b.service_status ? "selected" : ""}>${st}</option>`).join("")}</select>` : esc(title(String(b.service_status).toLowerCase()))}</td>
+    <td>${busState(b.state)}</td>
+    <td class="mono">${stamp(b.last_report)}</td>
+    <td class="mono">${b.last_position ? `${(+b.last_position.latitude).toFixed(5)}, ${(+b.last_position.longitude).toFixed(5)}` : "no GPS yet"}</td>
+    <td class="num">${b.events_total}</td>
+    <td class="num">${b.cases_open}</td>
+    <td class="num">${b.trips}</td>
+    <td class="num">${km(b.distance_m)}</td>`, {onclick:true});
+}
+function routesTable(routes){
+  return table(["Route","Buses","Segments","Samples","Avg vehicles","Avg density","Congested","Delay","Incidents","Road defects"], routes, r => `
+    <td><b>${esc(r.route_id)}</b> <span style="color:var(--ink-3)">${esc(r.name || "")}</span></td>
+    <td>${esc((r.buses || []).join(", ") || "–")}</td>
+    <td class="num">${r.segments}</td><td class="num">${r.observations}</td>
+    <td class="num">${num(r.avg_vehicles)}</td><td class="num">${pct(r.avg_density_pct)}</td>
+    <td class="num">${r.congested_share != null ? pct(r.congested_share * 100) : "–"}</td>
+    <td class="num">${num(r.delay_minutes)} min</td>
+    <td class="num">${r.incidents}</td><td class="num">${r.road_defects}</td>`);
+}
+function odTable(od){
+  return table(["Origin segment","Destination segment","Trips","Buses","Distance","Events"], od, o => `
+    <td class="mono">${esc(o.origin_segment || "–")}</td><td class="mono">${esc(o.destination_segment || "–")}</td>
+    <td class="num">${o.trips}</td><td>${esc((o.buses || []).join(", "))}</td>
+    <td class="num">${km(o.distance_m)}</td><td class="num">${o.events}</td>`);
+}
+function fleetKpis(t, windowMin){
+  return `<div class="kpis">
+    ${kpi("Buses in fleet", t.registered, "registered in the fleet table", "acc")}
+    ${kpi("Reporting now", t.reporting, `reported in the last ${windowMin} min`, t.reporting ? "ok" : "")}
+    ${kpi("Idle / no reports", (t.idle || 0) + (t.no_reports || 0), `${t.no_reports || 0} have never reported`)}
+    ${kpi("In maintenance", t.maintenance, "maintenance or out of service", t.maintenance ? "med" : "")}
+    ${kpi("Trips", t.trips, "one per pipeline run per bus")}
+    ${kpi("Distance", km(t.distance_m), "along reported GPS")}
+    ${kpi("Road coverage", `${num(t.approx_road_km)} km`, `${t.segments_covered} road segments`)}
+    ${kpi("Open events on buses", t.cases_open, "raised by fleet cameras", t.cases_open ? "high" : "")}
+  </div>`;
+}
+views.fleet = async () => {
+  const [f, routes, od] = await Promise.all([api("/fleet"), api("/fleet/routes"), api("/fleet/od")]);
+  return fleetKpis(f.totals, f.active_window_minutes) + `
+    <div style="margin-top:12px">${card("Fleet status", busTable(f, true), {pad:false, right:"click a bus for its trail, trips and events"})}</div>
+    <div id="busDetail" style="margin-top:12px"></div>
+    <div class="grid" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);margin-top:12px">
+      ${card("Route performance", routesTable(routes), {pad:false})}
+      ${card("Origin / destination (trips)", odTable(od), {pad:false})}
+    </div>`;
+};
+async function openBus(busId){
+  const host = $("#busDetail"); if(!host) return;
+  host.innerHTML = card(`Bus ${busId}`, loading(3), {pad:false});
+  try{
+    const b = await api(`/fleet/${encodeURIComponent(busId)}`, {fresh:true});
+    const cases = b.cases || [];
+    host.innerHTML = `<div class="detail">
+      ${card(`${b.bus_id} · ${b.route_name || b.route_id || "no route"} · ${title(String(b.state).toLowerCase())}`,
+        `<div id="busMap" style="height:300px"></div>`, {pad:false, right:`${(b.trail || []).length} GPS points`})}
+      <div class="grid" style="gap:12px">
+        ${card("Trips", table(["Trip","Started","Origin","Destination","Distance","Duration","Events"], b.trips_detail || [], t => `
+          <td class="num">${t.trip}</td><td class="mono">${stamp(t.started)}</td>
+          <td class="mono">${esc(t.origin.segment || "–")}</td><td class="mono">${esc(t.destination.segment || "–")}</td>
+          <td class="num">${km(t.distance_m)}</td><td class="num">${t.duration_s != null ? `${num(t.duration_s)} s` : "–"}</td>
+          <td class="num">${t.events}</td>`), {pad:false})}
+        ${card("Events raised by this bus", cases.length ? `<div class="tablewrap"><table><thead><tr><th>Event</th><th>Type</th><th>Status</th><th>Severity</th><th>Last seen</th></tr></thead>
+          <tbody>${cases.map(c => `<tr class="clickable" data-case="${esc(c.case_id)}"><td><span class="id">${esc(c.case_id)}</span></td>
+            <td>${esc(c.title)}</td><td>${statusPill(c.status)}</td><td>${sev(c.severity)}</td><td class="mono">${stamp(c.last_seen)}</td></tr>`).join("")}
+          </tbody></table></div>` : empty("No events visible to you", ""), {pad:false})}
+      </div></div>`;
+    const trail = (b.trail || []).map(p => [+p.latitude, +p.longitude]);
+    const markers = b.last_position ? [{lat:+b.last_position.latitude, lon:+b.last_position.longitude, kind:"buses",
+      color:LAYER_COLOR.buses, radius:8, title:b.bus_id, popup:`<b>${esc(b.bus_id)}</b><br>last report ${esc(stamp(b.last_report))}`}] : [];
+    renderMap("busMap", markers, {lines:[{points:trail, color:LAYER_COLOR.buses}]});
+  }catch(e){ host.innerHTML = card(`Bus ${busId}`, errorBox(e)); }
+}
+function wireFleet(rows){
+  document.querySelectorAll("#view tbody tr.clickable[data-idx]").forEach(tr => tr.onclick = e => {
+    if(e.target.closest("select")) return;
+    openBus(rows[+tr.dataset.idx].bus_id);
+  });
+  document.querySelectorAll("#view [data-busstatus]").forEach(sel => sel.onchange = async () => {
+    try{
+      await patch(`/fleet/${encodeURIComponent(sel.dataset.busstatus)}`, {status:sel.value});
+      toast(`${sel.dataset.busstatus} set to ${title(sel.value.toLowerCase())}`, "", "ok");
+      render({quiet:true});
+    }catch(e){ toast("Could not update the bus", e.message, "err"); }
+  });
+}
+views.fleet.after = async () => { const f = await api("/fleet"); wireFleet(f.buses); };
+
+/* ---------------------------------------------- Users / Departments */
+views.users = async () => {
+  const [users, depts, roles] = await Promise.all([api("/users", {fresh:true}), api("/departments", {fresh:true}), api("/roles")]);
+  const deptCards = `<div class="kpis">${depts.map(d => `<div class="kpi" style="border-top:3px solid ${DEPT_COLOR[d.department] || "var(--line)"}">
+      <div class="k">${esc(d.label)}</div><div class="v">${d.active_users}<span style="font-size:13px;color:var(--ink-3)"> / ${d.users} users</span></div>
+      <div class="n">${d.field_officers} field officer(s) · ${d.open_events} open events</div></div>`).join("")}</div>`;
+  const rows = table(["Name","Email","Username","Role","Department","Status","Last login",""], users, u => `
+    <td><b>${esc(u.name)}</b></td><td class="mono">${esc(u.email)}</td><td class="mono">${esc(u.username || "–")}</td>
+    <td>${esc(u.role_label)}</td><td>${esc(u.department_label)}</td>
+    <td><span class="tag ${u.is_active ? "confirmed" : ""}" style="${u.is_active ? "background:#DDF3E8;color:#127047" : ""}">${u.is_active ? "Active" : "Inactive"}</span></td>
+    <td class="mono">${stamp(u.last_login_at)}</td>
+    <td>${u.user_id === ME.user.user_id ? `<span class="tag">you</span>` : `
+      <button class="btn ${u.is_active ? "warn" : ""}" data-uact="${esc(u.user_id)}" data-on="${u.is_active ? 1 : 0}">${u.is_active ? "Deactivate" : "Activate"}</button>
+      <button class="btn" data-upw="${esc(u.user_id)}" data-uname="${esc(u.name)}">Reset password</button>`}</td>`);
+  const roleOpts = roles.map(r => `<option value="${r.role}">${esc(r.label)}</option>`).join("");
+  const create = `<form id="newUser" class="formgrid" autocomplete="off">
+      <div class="field"><label>Full name</label><input class="input" name="name" required></div>
+      <div class="field"><label>Email</label><input class="input" name="email" type="email" required></div>
+      <div class="field"><label>Username (optional)</label><input class="input" name="username"></div>
+      <div class="field"><label>Role</label><select class="input" name="role" id="nuRole">${roleOpts}</select></div>
+      <div class="field"><label>Department (field officers)</label><select class="input" name="department" id="nuDept" disabled>
+        ${DEPARTMENTS.slice(1).map(([v,l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select></div>
+      <div class="field"><label>Initial password (8+)</label><input class="input" name="password" type="password" autocomplete="new-password" required></div>
+      <div class="field"><button class="btn primary" type="submit" style="padding:8px 14px">Create user</button></div>
+    </form><div class="loginmsg" id="nuMsg"></div>`;
+  return deptCards + `<div style="margin-top:12px">${card("Users", rows, {pad:false, right:`${users.length} accounts`})}</div>
+    <div style="margin-top:12px">${card("Create user", create)}</div>`;
+};
+views.users.after = () => {
+  const roleSel = $("#nuRole"), deptSel = $("#nuDept");
+  if(roleSel) roleSel.onchange = () => { deptSel.disabled = roleSel.value !== "FIELD_OFFICER"; };
+  const form = $("#newUser");
+  if(form) form.onsubmit = async ev => {
+    ev.preventDefault();
+    const f = new FormData(form), msg = $("#nuMsg");
+    const body = {name:f.get("name"), email:f.get("email"), username:f.get("username") || null,
+      role:f.get("role"), password:f.get("password")};
+    if(body.role === "FIELD_OFFICER") body.department = deptSel.value;
+    try{
+      const u = await post("/users", body);
+      toast(`Created ${u.name}`, `${u.role_label} · ${u.department_label}`, "ok");
+      render({quiet:true});
+    }catch(e){ msg.className = "loginmsg err"; msg.textContent = e.message; }
+  };
+  document.querySelectorAll("#view [data-uact]").forEach(b => b.onclick = async () => {
+    try{
+      const on = b.dataset.on === "1";
+      await patch(`/users/${encodeURIComponent(b.dataset.uact)}`, {is_active:!on});
+      toast(on ? "User deactivated" : "User activated", on ? "Their sessions on web and mobile were revoked." : "", "ok");
+      render({quiet:true});
+    }catch(e){ toast("Could not update the user", e.message, "err"); }
+  });
+  document.querySelectorAll("#view [data-upw]").forEach(b => b.onclick = () => openModal(`Reset password: ${b.dataset.uname}`,
+    `<div class="field"><label>New password (8+ characters)</label><input class="input" type="password" id="rpNew" autocomplete="new-password"></div>
+     <div class="viewonly">Their existing sessions are signed out. Give them the new password in person.</div>`,
+    async () => { await post(`/users/${encodeURIComponent(b.dataset.upw)}/reset-password`, {password:$("#rpNew").value});
+                  toast("Password reset", b.dataset.uname, "ok"); }, "Reset password"));
+};
+
+/* ---------------------------------------------- Department homes */
+function maxDelay(rows){
+  const byIssue = {};
+  rows.forEach(r => { const k = r.issue_id || r.event_id; byIssue[k] = Math.max(byIssue[k] || 0, +(meta(r).estimated_delay || 0)); });
+  return Object.values(byIssue).reduce((a, b) => a + b, 0);
+}
+const open = rows => rows.filter(c => c.status !== "RESOLVED");
+const working = rows => rows.filter(c => c.status === "ASSIGNED" || c.status === "IN_PROGRESS");
+
+// ---- Traffic
+views.traffic_home = async () => {
+  const [tr, cases] = await Promise.all([api("/traffic?limit=800"), api("/cases?limit=300&sort=recent")]);
+  const obs = tr.filter(r => r.event_type === "traffic_observation");
+  const cong = tr.filter(r => r.event_type === "traffic_congestion");
+  const bott = tr.filter(r => r.event_type === "traffic_bottleneck");
+  const latest = obs[0] ? meta(obs[0]) : {};
+  const asc = obs.slice().reverse();
+  const traffic = cases.items.filter(c => c.owner_department === "TRAFFIC_DEPARTMENT");
+  const incidents = cases.items.filter(c => ["rash_driving","collision","possible_collision"].includes(c.event_type));
+  const delayRows = [...cong, ...bott].filter(r => meta(r).estimated_delay != null);
+  return `<div class="kpis">
+      ${kpi("Open traffic issues", open(traffic).length, "congestion and bottleneck events", open(traffic).length ? "med" : "ok")}
+      ${kpi("Congestion events", cong.length, "sustained over the threshold", cong.length ? "high" : "")}
+      ${kpi("Bottlenecks", bott.length, "zone-level stalls", bott.length ? "high" : "")}
+      ${kpi("Vehicles (latest)", latest.vehicle_count, `unique so far ${latest.unique_vehicles ?? "–"}`, "acc")}
+      ${kpi("Vehicle density", pct(latest.density_percentage), `level ${latest.traffic_level || "–"}`,
+          latest.traffic_level === "CRITICAL" ? "crit" : latest.traffic_level === "HIGH" ? "high" : "ok")}
+      ${kpi("Estimated route delay", `${num(maxDelay([...cong, ...bott]))} min`, "from congestion episodes")}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);margin-top:12px">
+      ${card("Traffic heatmap", `<div id="map"></div>`, {pad:false, right:"segments coloured by peak level"})}
+      ${card("Vehicle density %", lineChart(asc.map(r => ({t:vtime(r.video_time_s), v:meta(r).density_percentage})), {unit:"%"}))}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+      ${card("Vehicle count per observation", lineChart(asc.map(r => ({t:vtime(r.video_time_s), v:meta(r).vehicle_count}))))}
+      ${card("Route delays", table(["Time","Type","Segment","Level","Duration","Delay"], delayRows, r => { const m = meta(r); return `
+        <td class="mono">${stamp(r.timestamp)}</td><td>${title(r.event_type)}</td><td class="mono">${esc(r.road_segment || "–")}</td>
+        <td>${esc(m.traffic_level || "–")}</td><td class="num">${m.congestion_duration != null ? `${num(m.congestion_duration)} s` : "–"}</td>
+        <td class="num">${num(m.estimated_delay)} min</td>`; }), {pad:false})}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);margin-top:12px">
+      ${card("Traffic issues", casesTable(traffic, {compact:true, note:"No congestion or bottleneck has been confirmed in the processed footage."}), {pad:false})}
+      ${card("Traffic incidents (collisions, rash driving)", casesTable(incidents, {compact:true, note:"No traffic incident in the processed footage."}), {pad:false})}
+    </div>
+    <div style="margin-top:12px">${card("Assigned traffic issues", casesTable(working(traffic), {compact:true, note:"Nothing is assigned or in progress."}), {pad:false})}</div>
+    <div style="margin-top:12px">${card("Relevant evidence", evidenceGallery([...traffic, ...incidents]))}</div>`;
+};
+views.traffic_home.after = () => renderLayerMap("map");
+
+// ---- Roads & Infrastructure
+views.roads_home = async () => {
+  const [sum, cases, issues] = await Promise.all([api("/cases/summary"), api("/cases?limit=400"), api("/issues?limit=1000")]);
+  const oc = sum.open_by_class || {};
+  const n = (...keys) => keys.reduce((a, k) => a + (oc[k] || 0), 0);
+  const persistent = issues.filter(i => !INFRA_OK.has(i.class_name)
+    && ((i.observation_count || 0) >= 2 || (i.bus_count || 0) >= 2 || (i.reopened_count || 0) > 0));
+  const assets = issues.filter(i => INFRA_OK.has(i.class_name));
+  window._roadIssues = persistent;
+  return `<div class="kpis">
+      ${kpi("Potholes", n("pothole"), "open", n("pothole") ? "high" : "ok")}
+      ${kpi("Damaged roads", n("damaged_road","road_damage_other"), "open", n("damaged_road","road_damage_other") ? "high" : "ok")}
+      ${kpi("Waterlogging", n("waterlogging"), "open", n("waterlogging") ? "med" : "ok")}
+      ${kpi("Missing dividers", n("missing_divider"), "open")}
+      ${kpi("Zebra crossings", n("missing_zebra_crossing","damaged_zebra_crossing"), "missing or damaged, open")}
+      ${kpi("Traffic signs", n("missing_traffic_signboard","damaged_traffic_signboard"), "missing or damaged, open")}
+      ${kpi("Persistent issues", persistent.length, "seen repeatedly or by several buses", persistent.length ? "med" : "")}
+      ${kpi("Resolved (24 h)", sum.resolved_24h, "closed in the last day", "ok")}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);margin-top:12px">
+      ${card("Road-condition map", `<div id="map"></div>`, {pad:false, right:"grey markers are resolved"})}
+      ${card("Open road issues by type", barChart(Object.entries(oc).sort((a, b) => b[1] - a[1]), {color:"var(--high)"}))}
+    </div>
+    <div style="margin-top:12px">${card("Open road issues", casesTable(open(cases.items)), {pad:false, right:"click for evidence and actions"})}</div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+      ${card("Assigned road issues", casesTable(working(cases.items), {compact:true, note:"Nothing is assigned or in progress."}), {pad:false})}
+      ${card("Persistent road issues", table(["Issue","Type","Seen","Buses","Status","Last seen"], persistent, i => `
+        <td><span class="id">${esc(i.issue_id)}</span></td><td>${title(i.class_name || i.issue_type)}</td>
+        <td class="num">${i.observation_count}x</td><td class="num">${i.bus_count}</td>
+        <td><span class="tag">${esc(i.status)}</span></td><td class="mono">${stamp(i.last_seen)}</td>`, {onclick:true}), {pad:false})}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);margin-top:12px">
+      ${card("Road asset inventory (present, healthy)", table(["Asset","Seen","Segment"], assets, i => `
+        <td>${title(i.class_name)}</td><td class="num">${i.observation_count}x</td><td class="mono">${esc(i.road_segment || "–")}</td>`), {pad:false})}
+      ${card("Recent evidence", evidenceGallery(cases.items.slice().sort((a, b) => (b.last_seen_epoch || 0) - (a.last_seen_epoch || 0)), 6))}
+    </div>`;
+};
+views.roads_home.after = () => {
+  renderLayerMap("map");
+  document.querySelectorAll("#view tbody tr.clickable[data-idx]").forEach(tr => tr.onclick = () =>
+    openCaseFor({issue_id:(window._roadIssues || [])[+tr.dataset.idx].issue_id}));
+};
+
+// ---- Public Safety
+views.safety_home = async () => {
+  const [sum, cases, reads] = await Promise.all([api("/cases/summary"), api("/cases?limit=400"),
+    can("anpr") ? api("/anpr?limit=100") : Promise.resolve([])]);
+  const bt = sum.by_type || {};
+  const mine = cases.items.filter(c => c.owner_department === "PUBLIC_SAFETY");
+  const confirmed = reads.filter(r => { const m = meta(r); return m.registration_number && m.registration_number !== "UNKNOWN" && !m.unverified_partial_read; }).length;
+  return `<div class="kpis">
+      ${kpi("Hit-and-run", bt.hit_and_run || 0, "managed events", bt.hit_and_run ? "crit" : "ok")}
+      ${kpi("Collisions", (bt.collision || 0) + (bt.possible_collision || 0), "confirmed and possible", (bt.collision || 0) ? "high" : "")}
+      ${kpi("Abnormal movement", bt.abnormal_movement || 0, "managed events", bt.abnormal_movement ? "med" : "")}
+      ${kpi("Pedestrian events", bt.pedestrian_vehicle_risk || 0, "person on a crossing near moving traffic", bt.pedestrian_vehicle_risk ? "high" : "")}
+      ${kpi("Open safety cases", open(mine).length, `${sum.unassigned_open} awaiting assignment`, open(mine).length ? "high" : "ok")}
+      ${kpi("ANPR reads", reads.length, `${confirmed} confirmed plates`, "acc")}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);margin-top:12px">
+      ${card("Incident map", `<div id="map"></div>`, {pad:false})}
+      ${card("Safety events by type", barChart(Object.entries(bt).sort((a, b) => b[1] - a[1]), {color:"var(--critical)"}))}
+    </div>
+    <div style="margin-top:12px">${card("Open safety cases", casesTable(open(mine)), {pad:false, right:"click for evidence and actions"})}</div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+      ${card("Assigned safety cases", casesTable(working(mine), {compact:true, note:"Nothing is assigned or in progress."}), {pad:false})}
+      ${card("ANPR incident evidence", table(["Time","Registration","Conf","Triggered by","Plate"], reads.slice(0, 20), r => { const m = meta(r); return `
+        <td class="mono">${stamp(r.timestamp)}</td><td class="mono"><b>${esc(m.registration_number || "UNKNOWN")}</b></td>
+        <td class="num">${confPct(r.confidence)}</td><td>${title(m.triggered_by_event_type || "–")}</td>
+        <td>${thumb(r.evidence_image, "plate")}</td>`; }), {pad:false, right:`<a href="#anpr">all reads</a>`})}
+    </div>
+    <div style="margin-top:12px">${card("Evidence", evidenceGallery(mine))}</div>`;
+};
+views.safety_home.after = () => renderLayerMap("map");
+
+// ---- Transport Authority
+views.transport_home = async () => {
+  const [f, routes, od, cases] = await Promise.all([api("/fleet"), api("/fleet/routes"), api("/fleet/od"), api("/cases?limit=300&sort=recent")]);
+  const impact = routes.flatMap(r => (r.impact || []).map(i => ({...i, route_id:r.route_id})));
+  const delay = routes.reduce((a, r) => a + (r.delay_minutes || 0), 0);
+  return fleetKpis(f.totals, f.active_window_minutes) + `
+    <div class="grid" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);margin-top:12px">
+      ${card("Bus locations and traffic", `<div id="map"></div>`, {pad:false, right:"last reported positions"})}
+      ${card("Route delays", `<div class="kpis" style="grid-template-columns:1fr 1fr">
+          ${kpi("Delay on routes", `${num(delay)} min`, "summed congestion delay estimates", delay ? "med" : "ok")}
+          ${kpi("Incidents on routes", routes.reduce((a, r) => a + (r.incidents || 0), 0), "raw incident detections")}
+        </div>
+        <div style="margin-top:10px">${barChart(routes.map(r => [r.route_id, r.delay_minutes || 0]), {color:"var(--medium)"})}</div>`)}
+    </div>
+    <div style="margin-top:12px">${card("Route performance", routesTable(routes), {pad:false})}</div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+      ${card("Bus-wise events", table(["Bus","State","Route","Events","Top types","Open events"], f.buses, b => `
+        <td><span class="id">${esc(b.bus_id)}</span></td><td>${busState(b.state)}</td><td>${esc(b.route_id || "–")}</td>
+        <td class="num">${b.events_total}</td>
+        <td>${Object.entries(b.events_by_type || {}).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `<span class="tag">${esc(title(k))} ${v}</span>`).join(" ") || "–"}</td>
+        <td class="num">${b.cases_open}</td>`), {pad:false, right:`<a href="#fleet">fleet detail</a>`})}
+      ${card("Traffic impact on routes", impact.length ? `<div class="tablewrap"><table><thead><tr><th>Route</th><th>Event</th><th>Type</th><th>Status</th><th>Segment</th></tr></thead><tbody>
+          ${impact.map(i => `<tr class="clickable" data-case="${esc(i.case_id)}"><td>${esc(i.route_id)}</td><td><span class="id">${esc(i.case_id)}</span></td>
+            <td>${esc(i.title)}</td><td>${statusPill(i.status)}</td><td class="mono">${esc(i.road_segment || "–")}</td></tr>`).join("")}</tbody></table></div>`
+        : empty("No congestion or incident on the route segments", ""), {pad:false})}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+      ${card("Origin / destination analytics", odTable(od), {pad:false})}
+      ${card("Events affecting the fleet", casesTable(open(cases.items), {compact:true, note:"No open event visible to Transport."}), {pad:false})}
+    </div>`;
+};
+views.transport_home.after = () => renderLayerMap("map");
+
+// ---- Field Officer
+let nearbyRows = null;
+views.field_home = async () => {
+  const [sum, mine, pool] = await Promise.all([api("/cases/summary"),
+    api("/cases?assigned=me&limit=200&sort=status"), api("/cases?open_only=true&assigned=unassigned&limit=100")]);
+  const myOpen = open(mine.items);
+  const tasks = myOpen.length ? myOpen.map(c => `<div class="taskcard" data-case="${esc(c.case_id)}">
+      ${c.thumbnail ? `<img src="${esc(c.thumbnail)}" alt="">` : `<img alt="">`}
+      <div class="x"><b>${esc(c.title)} <span class="id">${esc(c.case_id)}</span></b>
+        <span>${esc(c.road_segment || "–")} · ${esc(c.bus_id || "–")} · seen ${stamp(c.last_seen)}</span></div>
+      <div style="text-align:right">${statusPill(c.status)}<div class="viewonly" style="margin-top:4px">next: ${esc(NEXT_STEP[c.status])}</div></div>
+    </div>`).join("") : empty("No tasks assigned to you", "Pick up an unassigned event below, or wait for your department to assign one.");
+  return `<div class="kpis">
+      ${kpi("My open tasks", myOpen.length, "assigned to you", myOpen.length ? "acc" : "ok")}
+      ${kpi("In progress", mine.items.filter(c => c.status === "IN_PROGRESS").length, "work started")}
+      ${kpi("Awaiting pickup", pool.total, "open and unassigned in your department", pool.total ? "med" : "")}
+      ${kpi("Priority alerts", sum.critical_open, "critical open events", sum.critical_open ? "crit" : "ok")}
+      ${kpi("Resolved (24 h)", sum.resolved_24h, "by your department", "ok")}
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);margin-top:12px">
+      ${card("My tasks", tasks, {pad:false})}
+      ${card("Map", `<div id="map"></div>`, {pad:false})}
+    </div>
+    <div style="margin-top:12px">${card("Nearby open events", `<div class="body"><button class="btn primary" id="nearBtn">Use my location</button>
+        <span class="viewonly" style="margin-left:8px">Sorted by distance from where you are.</span></div><div id="nearList">${
+        nearbyRows ? nearbyTable(nearbyRows) : ""}</div>`, {pad:false})}</div>
+    <div style="margin-top:12px">${card("Unassigned in my department", casesTable(pool.items, {compact:true, note:"Everything open is assigned."}), {pad:false})}</div>`;
+};
+function nearbyTable(rows){
+  return table(["Distance","Event","Type","Status","Severity"], rows, c => `
+    <td class="num">${c.distance_m != null ? `${c.distance_m} m` : "–"}</td><td><span class="id">${esc(c.case_id)}</span></td>
+    <td>${esc(c.title)}</td><td>${statusPill(c.status)}</td><td>${sev(c.severity)}</td>`);
+}
+views.field_home.after = () => {
+  renderLayerMap("map");
+  const b = $("#nearBtn");
+  if(b) b.onclick = () => {
+    if(!navigator.geolocation){ toast("Location is not available in this browser", "", "err"); return; }
+    b.disabled = true; b.textContent = "Locating…";
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try{
+        const r = await api(`/cases?open_only=true&sort=distance&limit=30&near=${pos.coords.latitude},${pos.coords.longitude}`, {fresh:true});
+        nearbyRows = r.items;
+        $("#nearList").innerHTML = nearbyTable(nearbyRows);
+        $("#nearList").querySelectorAll("tbody tr").forEach((tr, i) => { tr.classList.add("clickable"); tr.setAttribute("data-case", nearbyRows[i].case_id); });
+      }catch(e){ toast("Could not load nearby events", e.message, "err"); }
+      finally{ b.disabled = false; b.textContent = "Use my location"; }
+    }, err => { toast("Location permission denied", err.message, "err"); b.disabled = false; b.textContent = "Use my location"; },
+    {enableHighAccuracy:true, timeout:10000});
+  };
+  if(nearbyRows) $("#nearList").querySelectorAll("tbody tr").forEach((tr, i) => { tr.classList.add("clickable"); tr.setAttribute("data-case", nearbyRows[i].case_id); });
+};
+
+/* ---------------------------------------------- GIS map (role-aware layers) */
+let mapLayersOn = null, mapDept = "ALL", mapMarkers = [];
+views.map = async () => {
+  const p = ME.permissions;
+  if(!mapLayersOn) mapLayersOn = [...p.default_layers];
+  const q = new URLSearchParams({layers: mapLayersOn.join(",") || "none"});
+  if(isCentral() && mapDept !== "ALL") q.set("department", mapDept);
+  const data = await api(`/map/layers?${q}`, {fresh:true});
+  mapMarkers = layerMarkers(data.layers);
+  const count = k => (data.layers[k] || []).length;
+  const chips = p.map_layers.map(k => `<button class="btn ${mapLayersOn.includes(k) ? "on" : ""}" data-layer="${k}">
+      <i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${LAYER_COLOR[k]};margin-right:5px"></i>${esc(LAYER_LABEL[k])}${
+      mapLayersOn.includes(k) ? ` <span class="mono" style="opacity:.7">${count(k)}</span>` : ""}</button>`).join("");
+  return `<div class="filters"><span class="lbl">Layers</span>${chips}
+      ${isCentral() ? `<span class="lbl" style="margin-left:8px">Department</span>${deptSelect("mapDept", mapDept)}` : ""}
+      <span class="lbl" style="margin-left:auto">${mapMarkers.length} markers</span></div>
+    ${card(routeLabel("map"), `<div id="mapFull"></div>
+      <div class="legend">${mapLayersOn.map(k => `<span><i style="background:${LAYER_COLOR[k]}"></i>${esc(LAYER_LABEL[k])}</span>`).join("")}
+        <span><i style="background:#9AA5B5"></i>Resolved</span>
+        <span style="color:var(--ink-3)">Traffic segments are coloured by peak level. Click a marker to open its event.</span></div>`, {pad:false})}`;
+};
+views.map.after = () => {
+  document.querySelectorAll("#view [data-layer]").forEach(b => b.onclick = () => {
+    const k = b.dataset.layer;
+    mapLayersOn = mapLayersOn.includes(k) ? mapLayersOn.filter(x => x !== k) : [...mapLayersOn, k];
+    render();
+  });
+  const d = $("#mapDept"); if(d) d.onchange = () => { mapDept = d.value; render(); };
+  renderMap("mapFull", mapMarkers);
+};
+
+/* ---------------------------------------------- hooks into the original pages */
+// Central Command dashboard: unchanged, plus department activity and the
+// lifecycle breakdown underneath.
+const _dashboardBase = views.dashboard, _dashboardAfter = views.dashboard.after;
+views.dashboard = async () => {
+  const [base, sum] = await Promise.all([_dashboardBase(), api("/cases/summary")]);
+  const depts = Object.entries(sum.by_department || {});
+  return base + `<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+    ${card("Department activity", table(["Department","Open events","Total",""], depts, ([d, b]) => `
+      <td><span class="udot" style="background:${DEPT_COLOR[d]}"></span>${esc(deptName(d))}</td>
+      <td class="num">${b.open}</td><td class="num">${b.total}</td>
+      <td><a href="#events" data-deptlink="${esc(d)}">open list</a></td>`), {pad:false, right:`${sum.open} open · ${sum.critical_open} critical`})}
+    ${card("Event lifecycle", barChart(STATUSES.map(st => [STATUS_LABEL[st], sum.by_status[st] || 0])))}
+  </div>`;
+};
+views.dashboard.after = async () => {
+  await _dashboardAfter();
+  document.querySelectorAll("#view [data-deptlink]").forEach(a => a.onclick = () => { EV.dept = a.dataset.deptlink; EV.status = "open"; });
+};
+
+/* ==================================================================
+   6.  Router + chrome
+   ================================================================== */
+const SUBTITLE = {
+  dashboard:"Fleet-wide situational overview",
+  live:"Annotated detection output with a synchronised event feed",
+  map:"Every located event on one map",
+  incidents:"Collision, rash driving and hit-and-run register",
+  hitrun:"Hit-and-run investigation",
+  anpr:"Plate identification requested by incidents only",
+  traffic:"Congestion, density and route analytics",
+  road:"Potholes, damage, dividers, crossings, signage, waterlogging",
+  issues:"Deduplicated issues tracked across buses and passes",
+  analytics:"Breakdowns across the whole dataset",
+};
+
+const SUBTITLE_EXTRA = {
+  events:"Shared lifecycle: detected, verified, assigned, in progress, resolved",
+  evidence:"Annotated frames, recordings and crops linked to each event",
+  notifications:"Role-aware alerts, the same on web and mobile",
+  fleet:"Fleet status, routes, trips and coverage",
+  users:"Accounts, roles and departments",
+  traffic_home:"Congestion, density, bottlenecks and route delays",
+  roads_home:"Potholes, damage, waterlogging, dividers, crossings, signage",
+  safety_home:"Hit-and-run, collisions, pedestrian events and ANPR",
+  transport_home:"Fleet, routes, delays and traffic impact",
+  field_home:"Assigned work, nearby events and priority alerts",
+};
+const MAP_SUB = {
+  CENTRAL_COMMAND:"Every layer, every department", TRAFFIC_DEPARTMENT:"Traffic heatmap and traffic incidents",
+  ROADS_INFRASTRUCTURE:"Potholes, damage, waterlogging and road assets", PUBLIC_SAFETY:"Incidents and ANPR reads",
+  TRANSPORT_AUTHORITY:"Bus positions and traffic on the routes", FIELD_OFFICER:"Your department's events",
+};
+const subtitleFor = id => id === "map" ? (MAP_SUB[role()] || SUBTITLE.map) : (SUBTITLE_EXTRA[id] || SUBTITLE[id] || "");
+
+const navCounts = {};
+function navItem(id){
+  const r = ROUTES.find(x => x.id === id) || {ico:"•"};
+  const n = r.badge ? navCounts[r.badge] : 0;
+  const alert = r.badge === "hitrun" || r.badge === "unread";
+  return `<a href="#${id}" data-r="${id}"><span class="ico">${r.ico}</span>
+    <span class="lbl">${esc(routeLabel(id))}</span>${n ? `<span class="pill ${alert ? "alert" : ""}">${n}</span>` : ""}</a>`;
+}
+function buildNav(){
+  const nav = $("#nav");
+  if(!ME){ nav.innerHTML = ""; return; }
+  const seen = new Set();
+  let html = "";
+  (NAV[role()] || []).forEach(([group, ids]) => {
+    const items = ids.filter(id => can(id) && views[id] && !seen.has(id));
+    if(!items.length) return;
+    html += `<div class="nav-group">${esc(group)}</div>`;
+    items.forEach(id => { seen.add(id); html += navItem(id); });
+  });
+  // a page the server grants that the layout does not list still gets a link
+  (ME.permissions.pages || []).filter(id => views[id] && !seen.has(id)).forEach(id => { html += navItem(id); });
+  nav.innerHTML = html;
+  markNav();
+}
+function markNav(){
+  const id = current();
+  document.querySelectorAll("nav a").forEach(a =>
+    a.classList.toggle("on", a.dataset.r === id));
+}
+const current = () => (location.hash || "#dashboard").slice(1).split("?")[0];
+
+async function render({quiet=false}={}){
+  if(!ME) return;
+  let id = current();
+  // Client-side guard for convenience; the API refuses the data anyway.
+  if(!views[id] || !can(id)){
+    if(views[id] && location.hash) toast("Not available for your role", `${routeLabel(id)} belongs to another department.`, "err");
+    id = ME.permissions.home;
+    history.replaceState(null, "", "#" + id);
+  }
+  $("#viewTitle").textContent = routeLabel(id);
+  $("#viewSub").textContent = subtitleFor(id);
+  markNav();
+  const host = $("#view");
+  const scroll = host.scrollTop;
+  if(!quiet){ dropMaps(); host.innerHTML = card(" ", loading(6), {pad:false}); }
+  try{
+    const html = await views[id]();
+    if(current() !== id || !ME) return;             // navigated away meanwhile
+    dropMaps();
+    host.innerHTML = html;
+    if(views[id].after) await views[id].after();
+    if(quiet) host.scrollTop = scroll;
+  }catch(e){
+    if(e.status === 401) return;
+    host.innerHTML = card("Error", errorBox(e));
+    if(!quiet) toast("Request failed", e.message, "err");
+  }
+}
+
+async function refreshHealth(){
+  try{
+    const [h, sum] = await Promise.all([api("/health", {fresh:true}), api("/cases/summary", {fresh:true})]);
+    $("#healthDot").classList.remove("bad");
+    $("#healthText").textContent = `backend online · ${h.events ?? 0} events · ${sum.open} open`;
+    const t = h.events_by_type || {};
+    navCounts.incidents = INCIDENT_KEYS.reduce((a, k) => a + (t[k] || 0), 0);
+    navCounts.hitrun = t.hit_and_run || 0;
+    navCounts.defects = t.road_defect || 0;
+    navCounts.open = sum.open;
+    navCounts.mine = sum.assigned_to_me_open;
+    buildNav();
+    return h;
+  }catch(e){
+    if(e.status !== 401){
+      $("#healthDot").classList.add("bad");
+      $("#healthText").textContent = "backend unreachable";
+    }
+    throw e;
+  }
+}
+
+let autoTimer = null;
+$("#autoBtn").onclick = () => {
+  if(autoTimer){
+    clearInterval(autoTimer); autoTimer = null;
+    $("#autoBtn").textContent = "Auto-refresh: off";
+    $("#autoBtn").classList.remove("on");
+  }else{
+    autoTimer = setInterval(() => { clearCache(); refreshHealth().catch(()=>{}); render({quiet:true}); }, 10000);
+    $("#autoBtn").textContent = "Auto-refresh: 10s";
+    $("#autoBtn").classList.add("on");
+    toast("Auto-refresh enabled", "Reloading every 10 seconds", "ok");
+  }
+};
+$("#refreshBtn").onclick = async () => {
+  clearCache();
+  await refreshHealth().catch(() => {});
+  await render();
+  toast("Refreshed", "", "ok");
+};
+window.addEventListener("hashchange", render);
+
+(async function start(){
+  try{
+    const res = await fetch("/auth/me", {credentials:"same-origin"});
+    if(res.status === 401){ showLogin(); return; }
+    if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    ME = await res.json();                          // session cookie still valid
+    await boot();
+  }catch(e){
+    $("#view").innerHTML = card("Backend unreachable", `<div class="errorbox">
+      <strong>The dashboard cannot reach the API.</strong><br>
+      Start it with <code class="mono">python run_backend.py</code>, then reload.<br><br>
+      <span style="color:var(--ink-3)">${esc(e.message)}</span></div>`);
+  }
+})();
+</script>
+</body>
+</html>

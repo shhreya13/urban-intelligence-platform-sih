@@ -1,0 +1,16 @@
+{
+  "name": "Urban Intelligence - Command & Field",
+  "short_name": "UrbanIntel",
+  "description": "Department dashboards and field operations for the Urban Intelligence platform.",
+  "start_url": "/mobile/",
+  "scope": "/mobile/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F1B33",
+  "theme_color": "#0F1B33",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml"}
+  ]
+}

@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+outputs/analytics/*.json
+!outputs/analytics/.gitkeep
+models/*.pt
+!models/README.md
+.vscode/
+.idea/

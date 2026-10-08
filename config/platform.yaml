@@ -1,0 +1,408 @@
+# =====================================================================
+# AI URBAN INTELLIGENCE PLATFORM -- central configuration
+# ---------------------------------------------------------------------
+# Everything tunable lives here.  No module hardcodes a path or a
+# threshold.  Any value can also be overridden from the environment:
+#     UIP_VIDEO__SOURCE=data/videos/other.mp4  python run_pipeline.py
+# or from the command line:
+#     python run_pipeline.py --source data/videos/other.mp4 --bus-id BUS-02
+#
+# Paths are relative to the project root, so this file is identical on
+# Windows and Linux.
+# =====================================================================
+
+platform:
+  bus_id: "BUS-01"
+  camera_id: "CAM-FRONT"
+  log_level: "INFO"
+  log_file: "outputs/platform.log"
+  device: "cpu"            # "cpu", "0", "cuda:0"  -- GPU needs no other change
+
+video:
+  source: "data/videos/demo.mp4"   # a file path, or 0 for the webcam
+  loop: false
+  max_frames: 0            # 0 = process the whole clip
+  start_frame: 0
+  resize_width: 0          # e.g. 960 to speed up CPU runs; 0 keeps native size
+  display: false           # true opens a live cv2 window (press q to stop)
+  save_annotated: true
+  annotated_output: "outputs/runs/annotated.mp4"
+  # Codecs tried in order.  avc1/H264 play in a browser (the dashboard's
+  # Live page); mp4v is the OpenCV default and usually does not.
+  codec: "avc1,H264,mp4v"
+
+# There is no bus GPS hardware in this phase, so position is simulated
+# along a route.  Swap mode to "none" to run without GPS, or replace
+# core.geo.GPSProvider with a real NMEA reader later -- nothing else changes.
+gps:
+  mode: "simulated"        # simulated | fixed | none
+  start: [13.0827, 80.2707]
+  end:   [13.0900, 80.2800]
+  segment_size_m: 60       # road-segment quantisation used for dedup
+
+# ---------------------------------------------------------------------
+# SHARED PERCEPTION -- each model is loaded once and read by every module
+# ---------------------------------------------------------------------
+perception:
+  vehicle:                       # Person 2's detector + BoT-SORT
+    enabled: true
+    model: "models/yolo11n.pt"   # swap to yolo11s.pt for accuracy over speed
+    confidence_threshold: 0.25
+    image_size: 640
+    tracker: "botsort.yaml"
+    frame_stride: 1
+    speed_smoothing: 0.7
+    use_video_clock: true        # measure durations in video time, not wall time
+
+  road_defect:                   # Person 1's ROAD_DEFECT_MODEL
+    enabled: true
+    model: "models/road_defect_best.pt"
+    confidence_threshold: 0.35
+    image_size: 640
+    frame_stride: 5              # defects are static -- no need for every frame
+
+  waterlogging:                  # dedicated WATERLOGGING_MODEL (single class)
+    enabled: true
+    model: "models/waterlogging_best.pt"
+    # Model card (wl_share/VALIDATION_REPORT.md) trained + validated at
+    # imgsz 512 with conf 0.35 -- running inference at 640/0.4 (the old
+    # values here) silently starves recall, which is already low (~44%),
+    # since YOLO letterboxes to a size the model never saw. Keep these in
+    # sync with whatever imgsz/conf the weights were actually trained at.
+    confidence_threshold: 0.35
+    image_size: 512
+    frame_stride: 5              # standing water is static -- same reasoning
+                                 # as road_defect above
+
+  pedestrian:                    # Person 3's pedestrian/child detector
+    enabled: true
+    # No dedicated child-aware checkpoint has been trained yet (see
+    # vendor/person3_pedestrian_safety/train.py to produce one from the
+    # Roboflow human-v2 dataset and get real child-vs-adult classification).
+    # Until then this falls back to the generic COCO "person" class on the
+    # SAME weights file Module 2's vehicle detector already uses -- it will
+    # detect and track pedestrians (as class "person", not "child"), it just
+    # runs its own inference pass since Person 2's vendored detector only
+    # returns vehicle classes. Swap this path the moment a real checkpoint
+    # exists; nothing else in the module needs to change.
+    model: "models/yolo11n.pt"
+    confidence_threshold: 0.3
+    iou: 0.50
+    image_size: 640
+    tracker: "botsort.yaml"
+    frame_stride: 1               # people move -- run every frame, unlike
+                                  # the static-hazard models above
+
+# Raw class names in Person 1's checkpoint -> platform vocabulary.
+# Retraining with new classes (e.g. Waterlogging) only changes this block.
+road_defect_classes:
+  Pothole: "pothole"
+  Damaged road: "damaged_road"
+  D50: "road_damage_other"       # RDD-style code -- confirm the meaning with Person 1
+  Repair: "road_repair"
+  Divider: "divider"
+  Zebra Crossing: "zebra_crossing"
+  Traffic Sign: "traffic_signboard"
+
+# ---------------------------------------------------------------------
+# MODULES
+# ---------------------------------------------------------------------
+modules:
+  road_detection:                # MODULE 1 -- Person 1
+    enabled: true
+    min_confidence: 0.35
+    emit_cooldown_s: 3.0         # same defect, same place: report once per N s
+    save_evidence: true
+    emit_infrastructure: true    # also report healthy zebra crossings / signs
+    infrastructure_absence:
+      enabled: true              # infer missing_divider / missing_zebra_crossing
+      min_baseline_observations: 3
+
+  traffic:                       # MODULE 2 -- Person 2
+    enabled: true
+    maximum_vehicles: 20         # what counts as 100% density for this camera
+    observation_interval_s: 5.0  # heartbeat that feeds analytics + heatmap
+    free_flow_speed_px_s: 60.0   # calibrate per camera for a real delay estimate
+    congestion:
+      enabled: true
+      density_threshold: 0.40
+      speed_threshold: 35.0
+      minimum_duration_seconds: 8
+    bottleneck:
+      enabled: true
+      density_threshold: 0.60
+      speed_threshold: 15.0
+      minimum_duration_seconds: 10
+      rows: 3
+      columns: 3
+      max_vehicles_per_zone: 8
+    counting:
+      enabled: true
+      line_start: [0, 400]
+      line_end: [1280, 400]
+
+  pedestrian_safety:              # MODULE 3 -- Person 3
+    enabled: true
+    save_evidence: true
+    # -----------------------------------------------------------------
+    # PERSON != PEDESTRIAN  (SIH26124: "vulnerable pedestrian situations
+    # such as school children crossing roads")
+    # A vulnerable-pedestrian event is raised ONLY when, for the same
+    # tracked person, over several consecutive frames:
+    #   1. a zebra crossing is DETECTED by ROAD_DEFECT_MODEL (no fixed
+    #      image rectangle is ever treated as a crossing),
+    #   2. the person's feet are on that crossing, not on/in a vehicle,
+    #   3. vehicles are present AND moving (track displacement),
+    # and then exactly once per continuous crossing.
+    # Frame counts left commented scale from the video's real fps.
+    # -----------------------------------------------------------------
+    zebra_crossing:
+      classes: ["zebra_crossing"]     # canonical names from road_defect_classes
+      min_confidence: 0.35
+      min_detections: 2               # road-model passes before a crossing counts
+      match_iou: 0.2
+      # hold_frames: 15               # keep a crossing alive between strided passes
+    person:
+      foot_band_ratio: 0.2            # bottom 20% of the person box = feet
+      min_foot_overlap: 0.5           # >= half of the feet band on the crossing
+      on_vehicle_bottom_margin: 0.1   # feet inside a vehicle box = passenger/rider
+    vehicle_motion:
+      # window_frames: 15             # ~0.5 s of track history
+      min_displacement_px: 6.0        # absolute jitter floor
+      min_displacement_ratio: 0.12    # ... and x the vehicle's own box height
+      max_distance_to_crossing: 1.5   # x crossing diagonal; 0 = any vehicle in frame
+      ego_motion_compensation: true   # subtract the crossing's own image motion
+                                      # (bus moving) so parked cars do not "move"
+      ego_motion_min_detections: 3    # crossing passes needed to estimate it
+      ego_motion_significance: 2.0    # slope below N x std-error = detector jitter
+      occlusion_overlap: 0.05         # ignore vehicle samples while a person (not
+                                      # its rider) covers >= 5% of the box
+      max_shape_change: 0.3           # box cut off on one side = not movement
+    temporal:
+      # confirm_frames: 10            # consecutive frames all conditions hold
+      # exit_frames: 10               # consecutive frames off the crossing to close
+      # track_lost_frames: 30         # frames undetected before closing
+      # reentry_cooldown_frames: 30   # re-entry sooner = same crossing, no new event
+      require_crossing_motion: false  # true = person must also move along the crossing
+      crossing_progress_ratio: 0.25   # x person height, when the above is true
+    severity_floor: "HIGH"            # a confirmed event is never below this
+    # Person 3's additive, explainable risk weights -- unmodified from the
+    # original prototype's config.yaml. They now set the SEVERITY of a
+    # confirmed event; they no longer decide whether an event exists.
+    risk:
+      thresholds:
+        low_max: 20
+        medium_max: 45
+        high_max: 70
+      child_multiplier: 1.20
+      crossing_bonus: 15
+      road_bonus: 10
+      approach_bonus: 25
+      close_bonus: 25
+      close_distance_px: 70
+      dangerous_distance_px: 40
+      approach_threshold_px_per_frame: 0.8
+      vehicle_speed_px_per_frame: 1.0
+      max_pair_distance_px: 260
+
+  incident:                      # MODULE 4 -- Person 4
+    enabled: true
+    history_frames: 45
+    crop_buffer_frames: 12       # vehicle crops kept per track, for ANPR
+    crop_buffer_stride: 2
+    minimum_track_age: 5         # frames a track must exist before it can be
+                                 # judged -- a new box has no reliable velocity
+    anpr_trigger_confidence: 0.40  # lowered from 0.55 so weaker/possible-
+                                    # collision events still request a plate
+                                    # read; trades accuracy for recall
+
+    # -----------------------------------------------------------------
+    # NOTE ON THRESHOLD UNITS
+    # Person 4's detector is deliberately SCALE-FREE: contact is measured
+    # as IoU and motion as a ratio against the vehicle's own recent speed,
+    # not in raw pixels.  That is what lets one set of numbers work on a
+    # 1080p 60fps clip and a 480p 25fps clip.  Raw px/speed thresholds are
+    # therefore only used where they are genuinely a distance in the
+    # image (departure_distance_threshold) or a count of frames.
+    # -----------------------------------------------------------------
+
+    rash:
+      enabled: true
+      speed_threshold_px_s: 250.0     # sustained speed that counts as fast
+      acceleration_threshold: 150.0   # px/s^2, sudden accel or decel
+      lateral_threshold: 80.0         # px of sideways movement in one frame
+      # Temporal validation -- an abnormal-looking frame is NOT enough on
+      # its own. Left unset, these scale from the video's real fps (see
+      # IncidentModule._build): ~1/3 second of sustained abnormal
+      # readings (min 5 frames), checked over a ~1 second window.
+      # min_persist_frames: 10
+      # window_frames: 30
+      min_confidence: 0.5             # below this, do not create an event
+      cooldown_s: 6.0                 # do not re-report the same vehicle
+      trigger_anpr_on_high: true
+
+    collision:
+      enabled: true
+      history_frames: 30
+      # --- confirmation (strict tier -> event_type "collision") ---
+      confirm_peak: 0.62              # one hard-impact frame, or ...
+      confirm_sustained: 0.50         # ... this held for min_persist_frames
+      min_persist_frames: 2
+      contact_min_iou: 0.08           # boxes must really overlap
+      approach_min: 0.35              # they must have been closing, or ...
+      motion_min: 0.30                # ... shown impact-like motion change
+      cooldown_frames: 45             # one crash = one event
+      # --- false-positive guards (Person 4's findings report) ---
+      overlap_episode_min: 0.06       # what counts as "overlapping at all"
+      max_episode_frames: 30          # longer overlap = stuck traffic, not a crash
+      separated_threshold: 0.06       # the pair MUST have been apart earlier
+      max_vehicle_fraction: 0.42      # ignore near-field occluders this big
+      trigger_anpr: true              # confirmed collisions request a plate read
+                                      # directly (used to wait on hit-and-run only)
+      trigger_anpr_on_possible: true  # ALSO request a plate read on the loose
+                                      # "possible_collision" tier -- catches
+                                      # near-misses too, so expect more false
+                                      # triggers and more UNKNOWN reads
+      # --- possible-collision tier (same algorithm, lower bar) ---
+      possible:
+        confirm_peak: 0.45
+        confirm_sustained: 0.36
+        contact_min_iou: 0.05
+        approach_min: 0.25
+        motion_min: 0.20
+
+    hit_and_run:
+      enabled: true
+      departure_distance_threshold: 70.0  # px from the incident point
+      escape_ratio: 1.5                   # ... or this many vehicle-lengths
+      min_escape_frames: 12               # minimum observation before deciding
+      hit_and_run_confirmation_time: 0.4  # seconds; raises min_escape_frames
+      require_consecutive: 3              # consecutive "moving away" frames
+      track_loss_timeout: 30              # frames a track may be missing.
+                                          # Exceeding it = TRACK_LOST, which
+                                          # NEVER produces a hit-and-run.
+      monitor_window_frames: 120          # after this, the case closes as
+                                          # COLLISION_ONLY (vehicle stayed)
+      cooldown_frames: 90
+      trigger_anpr: true
+
+    # Demo trigger -- OFF by default.  Turn on with --demo-incident to
+    # exercise collision -> hit-and-run -> ANPR on footage with no real
+    # crash.  Everything it produces is labelled synthetic: true and shown
+    # with a SYNTHETIC badge on the dashboard.  It is never a detection.
+    demo:
+      inject_synthetic_collision: false
+      at_frame: 0                # 0 = as soon as a stable vehicle exists
+
+    evidence:
+      enabled: true
+      pre_frames: 10               # rolling frames kept before an incident
+      post_frames: 8               # frames captured after it
+      stride: 3                    # every Nth frame, to bound memory
+      save_clip: true
+
+  anpr:                          # MODULE 5 -- Person 5  (EVENT-TRIGGERED ONLY)
+    enabled: true
+    model: "models/plate_best.pt"
+    gpu: false
+    max_frames_to_ocr: 5
+    min_sharpness: 40.0
+    max_identifications: 40      # safety valve for a long video
+    trigger_event_types: ["hit_and_run", "collision", "rash_driving", "possible_collision"]
+    min_trigger_severity: "HIGH"
+    min_plate_confidence: 0.45   # below this the plate is published as
+                                 # UNKNOWN -- never a guessed number
+    save_evidence: true
+
+  intelligence:                  # MODULE 6 -- Person 6
+    enabled: true
+    dedup:
+      gps_radius_m: 35.0
+      time_window_s: 300
+      same_bus_window_s: 60
+    persistence:
+      resolve_after_clean_passes: 2
+      stale_after_days: 30
+    priority:
+      weights:
+        severity: 0.35
+        persistence: 0.25
+        traffic_impact: 0.20
+        safety_risk: 0.20
+
+# Override the default department routing for your city here, e.g.
+# departments:
+#   pothole: "Greater Chennai Corporation - Roads"
+departments: {}
+
+backend:
+  enabled: true
+  mode: "direct"                 # direct = write straight to SQLite (default)
+                                 # http   = POST /events to a running backend
+  url: "http://127.0.0.1:8000"
+  host: "127.0.0.1"
+  port: 8000
+  database: "outputs/urban_intelligence.db"
+  evidence_dir: "outputs/evidence"
+
+output:
+  events_jsonl: "outputs/runs/events.jsonl"
+  summary_json: "outputs/runs/summary.json"
+
+# ---------------------------------------------------------------------
+# MULTI-DEPARTMENT PLATFORM  (web dashboards + mobile app, one backend)
+# ---------------------------------------------------------------------
+auth:
+  enabled: true                  # false = every request is Central Command
+                                 # (only for running the old single-user
+                                 # dashboard on a trusted laptop)
+  # DEVELOPMENT ONLY.  Creates the six demo accounts on an EMPTY users
+  # table.  No password lives in this file or in the code: it comes from
+  # the environment variable UIP_AUTH__DEMO_PASSWORD (demo.sh / demo.bat
+  # set it), and if that is not set a random one is generated and written
+  # to demo_credentials_file.  Set to false for any real deployment.
+  seed_demo_users: true
+  demo_password: null
+  demo_credentials_file: "outputs/demo_credentials.txt"
+  pbkdf2_iterations: 600000      # PBKDF2-HMAC-SHA256, salted per user
+  min_password_length: 8
+  session_ttl_hours: 12          # web
+  mobile_session_ttl_hours: 168  # mobile app stays logged in for a week
+  max_failed_logins: 5           # per IP + login, then locked for ...
+  lockout_seconds: 60
+  # backend.mode: http -- the pipeline POSTs /events.  With a token set
+  # (UIP_AUTH__INGEST_TOKEN on both sides) ingestion needs the header
+  # X-Ingest-Token; without one it is accepted only from this machine.
+  ingest_token: null
+
+workflow:                        # shared event lifecycle (EV-1001 ...)
+  first_case_number: 1001
+  # Extra grouping on top of the intelligence engine's issue dedup, for
+  # short-lived types (pedestrian risk, congestion, abnormal movement ...):
+  # same type + bus + camera + recording, within this much VIDEO time and
+  # distance = one managed event.  Road defects rely on the engine's
+  # GPS-radius dedup alone.
+  group_window_s: 20.0
+  group_radius_m: 60.0
+  min_sync_interval_s: 2.0       # how often API reads fold new issues in
+  # Evidence = the annotated recording the pipeline already wrote,
+  # positioned at the event's frame.  Nothing is re-detected or redrawn.
+  clip_before_s: 3.0
+  clip_after_s: 4.0
+  min_match_score: 0.5           # linking events that predate run ids
+  frame_cache_dir: "outputs/cache/frames"
+
+fleet:                           # Transport Authority master data
+  active_window_minutes: 30      # a bus that reported within this is REPORTING
+  routes:
+    - route_id: "R-01"
+      name: "R-01 (simulated GPS corridor)"
+      origin: "13.0827, 80.2707"
+      destination: "13.0900, 80.2800"
+  # Registry only -- which buses exist and which route they run.  Position,
+  # trips, distance and events are always derived from what each bus
+  # actually reported; a bus that has reported nothing is shown as such.
+  buses:
+    - {bus_id: "BUS-01", route_id: "R-01", depot: "Depot 1", cameras: ["CAM-FRONT"]}
+    - {bus_id: "BUS-02", route_id: "R-01", depot: "Depot 1", cameras: ["CAM-FRONT"]}
+    - {bus_id: "BUS-03", route_id: "R-01", depot: "Depot 1", cameras: ["CAM-FRONT"]}

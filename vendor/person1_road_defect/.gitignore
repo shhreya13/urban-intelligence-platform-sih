@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Training artifacts we don't need in the repo
+*.avi
+*.mp4
+runs/
+*_batch*.jpg
+val_batch*
+train_batch*
+
+# OS junk
+.DS_Store

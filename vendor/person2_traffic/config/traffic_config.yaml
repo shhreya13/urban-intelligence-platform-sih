@@ -1,0 +1,52 @@
+camera:
+  source: 0
+  width: 1280
+  height: 720
+  fps: 30
+
+detection:
+  model: "yolo11n.pt"
+  confidence_threshold: 0.15
+  image_size: 640
+  frame_skip: 0
+
+roi:
+  enabled: false
+  polygon: []
+
+counting:
+  enabled: false
+  line_start: [100, 400]
+  line_end: [1100, 400]
+
+analytics:
+  density_window_seconds: 30
+
+traffic_levels:
+  low: 0.25
+  medium: 0.50
+  high: 0.75
+  critical: 0.90
+
+speed:
+  enabled: true
+  calibrated: false
+  pixels_per_meter: null
+
+congestion:
+  enabled: true
+  minimum_duration_seconds: 8
+  density_threshold: 0.40
+  speed_threshold: 35
+
+bottleneck:
+  enabled: true
+  density_threshold: 0.60
+  speed_threshold: 15
+  minimum_duration_seconds: 10
+  rows: 3
+  columns: 3
+  max_vehicles_per_zone: 8
+
+delay:
+  enabled: true

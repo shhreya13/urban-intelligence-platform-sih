@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1B33">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="UrbanIntel">
+<title>Urban Intelligence · Command &amp; Field</title>
+<link rel="manifest" href="/mobile/manifest.webmanifest">
+<link rel="icon" href="/mobile/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/mobile/icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* ==================================================================
+   URBAN INTELLIGENCE -- mobile Command & Field app
+   Mobile-first.  Same backend, same login, same database as the web
+   dashboard: every status change here is the change the web shows.
+   ================================================================== */
+:root{
+  --bg:#F1F4F8; --panel:#FFFFFF; --panel-2:#F6F8FB; --line:#E0E6EE;
+  --ink:#131A29; --ink-2:#4F5B6E; --ink-3:#8591A4;
+  --accent:#2F6FED; --dept:#2F6FED; --navy:#0F1B33;
+  --low:#188556; --medium:#B4740A; --high:#D2622A; --critical:#D93A3F; --info:#5E6B7D;
+  --nav-h:64px; --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+  --r:14px;
+  --sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--sans);-webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;overscroll-behavior-y:contain}
+a{color:var(--accent);text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:3px solid #9CC0FF;outline-offset:2px}
+#app{max-width:560px;margin:0 auto;min-height:100%;background:var(--bg);position:relative}
+
+/* ---------- login ---------- */
+#login{position:fixed;inset:0;z-index:100;display:none;flex-direction:column;justify-content:center;
+  padding:calc(var(--safe-t) + 24px) 22px calc(var(--safe-b) + 24px);
+  background:radial-gradient(900px 500px at 10% -10%,#2A4A8A 0%,#0F1B33 55%,#091122 100%);color:#fff}
+#login.show{display:flex}
+.lbox{max-width:420px;width:100%;margin:0 auto}
+.brandline{display:flex;gap:4px;margin-bottom:22px}
+.brandline i{flex:1;height:4px;border-radius:2px}
+#login h1{font-size:26px;letter-spacing:.08em;font-weight:800;line-height:1.1}
+#login .tag{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#9FB2D4;margin:6px 0 30px;font-weight:600}
+.lfield{margin-bottom:16px}
+.lfield label{display:block;font-size:13px;color:#C4D0E6;margin-bottom:6px;font-weight:600}
+.lfield input{width:100%;min-height:52px;border-radius:12px;border:1px solid #2C3E63;background:#15233F;color:#fff;
+  padding:0 14px;font:inherit;font-size:16px}
+.lfield input:focus{outline:none;border-color:#5B8CF2;box-shadow:0 0 0 3px rgba(91,140,242,.25)}
+#loginBtn{width:100%;min-height:54px;border-radius:12px;background:var(--accent);color:#fff;font-weight:800;
+  letter-spacing:.14em;font-size:15px;margin-top:6px}
+#loginBtn:disabled{opacity:.6}
+.lfoot{display:flex;justify-content:space-between;margin-top:18px;font-size:14px}
+.lfoot a{color:#9FC0FF;padding:8px 0}
+#loginMsg{margin-top:14px;min-height:20px;font-size:14px;color:#C4D0E6}
+#loginMsg.err{color:#FF9EA2}
+
+/* ---------- chrome ---------- */
+.topbar{position:sticky;top:0;z-index:40;background:var(--navy);color:#fff;
+  padding:calc(var(--safe-t) + 10px) 12px 10px 16px;display:flex;align-items:center;gap:8px;
+  border-bottom:3px solid var(--dept)}
+.topbar .t{flex:1;min-width:0}
+.topbar h1{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .sub{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9FB2D4;font-weight:600}
+[hidden]{display:none!important}
+.iconbtn{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff;flex:none}
+.iconbtn:active{background:rgba(255,255,255,.12)}
+.iconbtn svg{width:22px;height:22px}
+main{padding:14px 14px calc(var(--nav-h) + var(--safe-b) + 22px)}
+.bottomnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;z-index:45;
+  height:calc(var(--nav-h) + var(--safe-b));padding-bottom:var(--safe-b);background:#fff;border-top:1px solid var(--line);
+  display:grid;grid-auto-flow:column;grid-auto-columns:1fr;box-shadow:0 -4px 18px rgba(15,23,42,.06)}
+.bottomnav a{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:var(--ink-3);font-size:11px;font-weight:700;letter-spacing:.02em;min-height:48px}
+.bottomnav a svg{width:23px;height:23px}
+.bottomnav a.on{color:var(--dept)}
+.bottomnav a.on::before{content:"";position:absolute;top:0;left:28%;right:28%;height:3px;border-radius:0 0 3px 3px;background:var(--dept)}
+.nbadge{position:absolute;top:7px;left:calc(50% + 5px);background:var(--critical);color:#fff;border-radius:10px;
+  font-size:10.5px;line-height:18px;min-width:18px;padding:0 5px;text-align:center;font-weight:800}
+
+/* ---------- primitives ---------- */
+h2.sec{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:700;margin:20px 2px 10px;
+  display:flex;align-items:center;gap:8px}
+h2.sec .r{margin-left:auto;letter-spacing:0;text-transform:none;font-weight:600;font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;border-left:4px solid var(--line);min-height:84px}
+.kpi .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+.kpi .v{font-size:28px;font-weight:750;letter-spacing:-.02em;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .n{font-size:12px;color:var(--ink-3)}
+.kpi.crit{border-left-color:var(--critical)} .kpi.high{border-left-color:var(--high)} .kpi.med{border-left-color:var(--medium)}
+.kpi.ok{border-left-color:var(--low)} .kpi.acc{border-left-color:var(--dept)}
+.kpi[data-go]{cursor:pointer}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;margin:0 -2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;min-height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:#fff;
+  font-size:13.5px;font-weight:650;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px}
+.chip.on{background:var(--dept);border-color:var(--dept);color:#fff}
+.chip .c{font-family:var(--mono);font-size:12px;opacity:.8}
+.pill{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:10px;white-space:nowrap}
+.st-DETECTED{background:#FBE7E7;color:#B3242E} .st-VERIFIED{background:#FFF1D6;color:#8A5A00}
+.st-ASSIGNED{background:#E8F0FE;color:#1449B0} .st-IN_PROGRESS{background:#EDE7FC;color:#5B3CC4}
+.st-RESOLVED{background:#DDF3E8;color:#127047}
+.sev{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.06em;padding:2px 7px;border-radius:5px;border:1.5px solid currentColor}
+.sev.INFO{color:var(--info)} .sev.LOW{color:var(--low)} .sev.MEDIUM{color:var(--medium)}
+.sev.HIGH{color:var(--high)} .sev.CRITICAL{color:var(--critical)}
+.id{font-family:var(--mono);font-size:12px;color:var(--ink-2);background:#EEF1F6;padding:1px 6px;border-radius:5px}
+.muted{color:var(--ink-3);font-size:13px}
+.empty{text-align:center;color:var(--ink-3);padding:28px 16px;font-size:14px}
+.empty b{display:block;color:var(--ink-2);font-size:15px;margin-bottom:4px}
+.skel{height:76px;border-radius:var(--r);margin-bottom:10px;background:linear-gradient(90deg,#E9EDF3,#DDE3EC,#E9EDF3);
+  background-size:200% 100%;animation:sh 1.2s infinite}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* event cards */
+.ecard{display:flex;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:10px;margin-bottom:10px;min-height:78px;cursor:pointer;position:relative;overflow:hidden}
+.ecard:active{background:var(--panel-2)}
+.ecard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sevc,var(--line))}
+.ecard .th{width:74px;height:58px;border-radius:10px;object-fit:cover;background:#0B1220;flex:none;display:grid;place-items:center;
+  color:#8591A4;font-size:10px;text-align:center;margin-left:4px}
+.ecard .x{flex:1;min-width:0}
+.ecard .x b{display:block;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ecard .x .m{font-size:12.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ecard .x .row{display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap}
+.ecard .go{color:var(--ink-3);font-size:20px;flex:none;padding-right:4px}
+.dist{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--dept)}
+
+/* buttons */
+.btn{min-height:50px;border-radius:12px;border:1.5px solid var(--line);background:#fff;font-weight:800;font-size:14px;
+  letter-spacing:.06em;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;gap:8px;color:var(--ink)}
+.btn:active{transform:scale(.98)}
+.btn.block{width:100%}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.good{background:var(--low);border-color:var(--low);color:#fff}
+.btn.dark{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.warn{color:var(--critical);border-color:#F2B8BB}
+.btn:disabled{opacity:.38;transform:none}
+.btn svg{width:20px;height:20px}
+.stack{display:grid;gap:10px}
+.actgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actgrid .btn{min-height:56px;font-size:13.5px}
+
+/* event detail */
+.cat{font-size:12px;letter-spacing:.18em;font-weight:800;margin-bottom:2px}
+.etitle{font-size:24px;font-weight:800;letter-spacing:-.01em;line-height:1.15}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:9px 14px;font-size:14.5px}
+.facts dt{color:var(--ink-3);font-weight:600}
+.facts dd{font-weight:600;word-break:break-word}
+.facts dd.mono{font-family:var(--mono);font-size:13px}
+.bigstatus{font-family:var(--mono);font-size:20px;font-weight:800;letter-spacing:.06em;text-align:center;padding:12px;
+  border-radius:12px}
+.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:12px 0 14px}
+.steps i{height:6px;border-radius:3px;background:#E3E8EF}
+.steps i.on{background:var(--low)} .steps i.cur{background:var(--accent)}
+.stepl{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;font-size:10px;color:var(--ink-3);text-align:center;margin-top:-8px;
+  margin-bottom:14px;font-weight:700;letter-spacing:.02em}
+.preview{border-radius:12px;overflow:hidden;background:#0B1220;margin-bottom:10px;position:relative;cursor:zoom-in}
+.preview img{width:100%;display:block;max-height:240px;object-fit:contain}
+.preview span{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:3px 8px;border-radius:8px}
+.timeline{position:relative;padding-left:22px}
+.timeline::before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.tl{position:relative;padding-bottom:14px}
+.tl::before{content:"";position:absolute;left:-21px;top:4px;width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--ink-3)}
+.tl.RESOLVED::before{border-color:var(--low)} .tl.REOPENED::before{border-color:var(--critical)}
+.tl .when{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700}
+.tl .what{font-size:14px;font-weight:600}
+.plate{font-family:var(--mono);font-size:22px;font-weight:800;letter-spacing:.1em;padding:6px 12px;border:2.5px solid var(--ink);
+  border-radius:6px;background:#FFFDF0;display:inline-block}
+
+/* sheets, viewer, toast */
+#sheetMask{position:fixed;inset:0;background:rgba(10,16,30,.45);z-index:70;display:none}
+#sheet{position:fixed;left:50%;bottom:0;transform:translate(-50%,105%);width:100%;max-width:560px;z-index:71;
+  background:#fff;border-radius:18px 18px 0 0;padding:10px 16px calc(var(--safe-b) + 16px);transition:transform .22s ease;
+  max-height:85vh;overflow-y:auto}
+body.sheet-open #sheet{transform:translate(-50%,0)}
+body.sheet-open #sheetMask{display:block}
+.grab{width:42px;height:5px;border-radius:3px;background:#D5DCE6;margin:0 auto 12px}
+#sheet h3{font-size:18px;margin-bottom:12px}
+.opt{display:flex;align-items:center;gap:12px;min-height:60px;padding:8px 12px;border:1.5px solid var(--line);border-radius:12px;
+  margin-bottom:8px;cursor:pointer}
+.opt.on{border-color:var(--accent);background:#F2F6FF}
+.opt .av{width:38px;height:38px;border-radius:50%;background:var(--dept);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
+.opt b{display:block;font-size:15px} .opt span{font-size:12.5px;color:var(--ink-3)}
+textarea.in,input.in{width:100%;min-height:52px;border:1.5px solid var(--line);border-radius:12px;padding:12px;font:inherit;font-size:16px}
+textarea.in{min-height:96px;resize:vertical}
+#viewer{position:fixed;inset:0;background:#000;z-index:80;display:none;flex-direction:column}
+#viewer.show{display:flex}
+#viewer .vb{display:flex;align-items:center;gap:8px;padding:calc(var(--safe-t) + 8px) 10px 8px;color:#fff}
+#viewer .vb b{flex:1;font-size:15px}
+#viewer .vm{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;touch-action:pinch-zoom}
+#viewer img,#viewer video{max-width:100%;max-height:100%;display:block}
+#viewer .vc{color:#B8C2D3;font-size:12.5px;padding:10px 14px calc(var(--safe-b) + 12px)}
+#viewer .vc .btn{min-height:44px;margin-top:8px;background:#1C2740;border-color:#2C3A57;color:#fff}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + var(--safe-b) + 12px);z-index:90;
+  background:#131A29;color:#fff;padding:12px 16px;border-radius:12px;font-size:14px;max-width:92%;display:none;
+  box-shadow:0 10px 30px rgba(0,0,0,.25)}
+#toast.show{display:block;animation:tin .2s ease-out}
+body.sheet-open #toast,#viewer.show ~ #toast{bottom:auto;top:calc(env(safe-area-inset-top, 0px) + 72px)}
+#toast.err{background:#9B1C24}
+#toast.ok{background:#11603D}
+@keyframes tin{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* map */
+.map{height:300px;border-radius:var(--r);overflow:hidden;background:#E9EEF5;border:1px solid var(--line)}
+.map.tall{height:calc(100vh - var(--nav-h) - var(--safe-b) - 190px);min-height:320px}
+.leaflet-popup-content{font:13px/1.4 var(--sans);margin:10px 12px}
+.leaflet-popup-content a{display:inline-block;margin-top:6px;font-weight:800;padding:6px 0}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.notif{display:flex;gap:12px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:10px;cursor:pointer}
+.notif.unread{background:#F3F7FF;border-color:#C9DAFF}
+.notif .bar{width:4px;border-radius:2px;background:var(--info);flex:none}
+.notif .bar.CRITICAL{background:var(--critical)} .notif .bar.HIGH{background:var(--high)} .notif .bar.MEDIUM{background:var(--medium)}
+.notif b{display:block;font-size:14.5px} .notif span{font-size:13px;color:var(--ink-2)}
+.notif .when{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.dotu{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px}
+.profile{text-align:center;padding:20px 14px}
+.profile .av{width:72px;height:72px;border-radius:50%;background:var(--dept);color:#fff;display:grid;place-items:center;
+  font-size:26px;font-weight:800;margin:0 auto 10px}
+.list{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.list .li{display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.list .li:last-child{border-bottom:none}
+.list .li b{flex:1;font-size:14.5px;font-weight:650}
+.list .li span{font-size:13px;color:var(--ink-3)}
+.list .li[data-go],.list .li[data-dept]{cursor:pointer}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar" id="topbar" hidden>
+    <button class="iconbtn" id="backBtn" hidden aria-label="Back"></button>
+    <div class="t"><div class="sub" id="topSub">Urban Intelligence</div><h1 id="topTitle">Home</h1></div>
+    <button class="iconbtn" id="refreshBtn" aria-label="Refresh"></button>
+  </header>
+  <main id="main"></main>
+  <nav class="bottomnav" id="bottomnav" hidden></nav>
+</div>
+
+<!-- LOGIN: shared with the web dashboard through POST /auth/login -->
+<div id="login">
+  <form class="lbox" id="loginForm" autocomplete="on">
+    <div class="brandline"><i style="background:#2F6FED"></i><i style="background:#B4740A"></i><i style="background:#D2622A"></i><i style="background:#D93A3F"></i><i style="background:#188556"></i></div>
+    <h1>URBAN INTELLIGENCE</h1>
+    <div class="tag">Command &amp; Field App</div>
+    <div class="lfield"><label for="lu">Email / Username</label>
+      <input id="lu" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></div>
+    <div class="lfield"><label for="lp">Password</label>
+      <input id="lp" name="password" type="password" autocomplete="current-password" required></div>
+    <button id="loginBtn" type="submit">LOGIN</button>
+    <div class="lfoot"><a href="#" id="forgot">Forgot password</a><a href="/">Web dashboard</a></div>
+    <div id="loginMsg"></div>
+  </form>
+</div>
+
+<div id="sheetMask"></div>
+<div id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div id="sheetBody"></div></div>
+<div id="viewer" role="dialog" aria-modal="true">
+  <div class="vb"><b id="vTitle">Evidence</b><button class="iconbtn" id="vClose" aria-label="Close">&#10005;</button></div>
+  <div class="vm" id="vMain"></div>
+  <div class="vc" id="vCap"></div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+"use strict";
+
+/* ==================================================================
+   1. basics
+   ================================================================== */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const title = s => String(s || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+const num = n => (n === null || n === undefined || n === "") ? "–" : (typeof n === "number" ? n.toLocaleString(undefined, {maximumFractionDigits:1}) : n);
+const pct = n => (n === null || n === undefined) ? "–" : `${Math.round(n)}%`;
+const confPct = c => (c === null || c === undefined) ? "–" : `${Math.round(+c * 100)}%`;
+function stamp(ts){
+  if(!ts) return "–"; const d = new Date(ts); if(isNaN(d)) return String(ts);
+  return d.toLocaleString([], {month:"short", day:"numeric", hour:"2-digit", minute:"2-digit", hour12:false});
+}
+function clock(ts){ if(!ts) return "–"; const d = new Date(ts); return isNaN(d) ? String(ts) : d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", hour12:false}); }
+function ago(ts){
+  if(!ts) return "–"; const d = new Date(ts); if(isNaN(d)) return String(ts);
+  const s = (Date.now() - d.getTime()) / 1000;
+  if(s < 60) return "just now"; if(s < 3600) return `${Math.floor(s/60)} min ago`;
+  if(s < 86400) return `${Math.floor(s/3600)} h ago`; return `${Math.floor(s/86400)} d ago`;
+}
+const vtime = s => (s === null || s === undefined) ? "–" : `${String(Math.floor(s/60)).padStart(2,"0")}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+const initials = n => String(n||"?").split(/\s+/).filter(Boolean).slice(0,2).map(w => w[0].toUpperCase()).join("");
+
+const STATUSES = ["DETECTED","VERIFIED","ASSIGNED","IN_PROGRESS","RESOLVED"];
+const STATUS_LABEL = {DETECTED:"Detected", VERIFIED:"Verified", ASSIGNED:"Assigned", IN_PROGRESS:"In progress", RESOLVED:"Resolved"};
+const NEXT = {DETECTED:"Verify", VERIFIED:"Assign", ASSIGNED:"Start work", IN_PROGRESS:"Mark resolved", RESOLVED:"Done"};
+const SEV_COLOR = {CRITICAL:"#D93A3F", HIGH:"#D2622A", MEDIUM:"#B4740A", LOW:"#188556", INFO:"#5E6B7D"};
+const DEPT_COLOR = {CENTRAL_COMMAND:"#2F6FED", TRAFFIC_DEPARTMENT:"#B4740A", ROADS_INFRASTRUCTURE:"#D2622A",
+  PUBLIC_SAFETY:"#D93A3F", TRANSPORT_AUTHORITY:"#188556", FIELD_OFFICER:"#5B3CC4"};
+const DEPT_NAME = {CENTRAL_COMMAND:"Central Command", TRAFFIC_DEPARTMENT:"Traffic", ROADS_INFRASTRUCTURE:"Roads & Infrastructure",
+  PUBLIC_SAFETY:"Public Safety", TRANSPORT_AUTHORITY:"Transport"};
+const pill = s => `<span class="pill st-${esc(s)}">${esc((STATUS_LABEL[s] || title(s)).toUpperCase())}</span>`;
+const sev = s => `<span class="sev ${esc(s || "INFO")}">${esc(s || "INFO")}</span>`;
+const empty = (head, note="") => `<div class="empty"><b>${esc(head)}</b>${esc(note)}</div>`;
+const skel = (n=4) => Array.from({length:n}, () => `<div class="skel"></div>`).join("");
+function kpi(k, v, n="", cls="", go=""){
+  return `<div class="kpi ${cls}" ${go ? `data-go="${esc(go)}"` : ""}><div class="k">${esc(k)}</div><div class="v">${esc(num(v ?? 0))}</div><div class="n">${esc(n)}</div></div>`;
+}
+function errText(body, fallback=""){
+  if(!body) return fallback; const d = body.detail;
+  if(typeof d === "string") return d; if(d && d.message) return d.message; return fallback;
+}
+
+const ICON = (d, extra="") => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
+const I = {
+  home: ICON('<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'),
+  map: ICON('<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/>'),
+  list: ICON('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'),
+  bell: ICON('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 21a2 2 0 0 0 4 0"/>'),
+  user: ICON('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
+  target: ICON('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>'),
+  route: ICON('<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a4 4 0 0 0 0-8H8a4 4 0 0 1 0-8h8"/>'),
+  check: ICON('<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
+  bus: ICON('<rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16M8 21v-3M16 21v-3"/>'),
+  back: ICON('<path d="M15 18l-6-6 6-6"/>'),
+  refresh: ICON('<path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/>'),
+  image: ICON('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>'),
+  play: ICON('<path d="M6 4l14 8-14 8z"/>'),
+};
+
+/* ==================================================================
+   2. API -- same endpoints as the web dashboard, same session cookie
+   ================================================================== */
+async function api(path, {method="GET", body=null}={}){
+  const res = await fetch(path, {
+    method, credentials:"same-origin", cache:"no-store",
+    headers: body !== null ? {"Content-Type":"application/json"} : {},
+    body: body !== null ? JSON.stringify(body) : undefined,
+  });
+  if(res.status === 401){ showLogin("Your session has ended. Please log in again."); const e = new Error("Login required"); e.status = 401; throw e; }
+  if(!res.ok){
+    let j = null; try{ j = await res.json(); }catch(_){}
+    const e = new Error(errText(j, `${res.status} ${res.statusText}`)); e.status = res.status; throw e;
+  }
+  return res.json();
+}
+const post = (p, b={}) => api(p, {method:"POST", body:b});
+
+let toastTimer = null;
+function toast(text, kind=""){
+  const t = $("#toast"); t.textContent = text; t.className = `show ${kind}`;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = ""; }, 3200);
+}
+
+/* ==================================================================
+   3. session + role
+   ================================================================== */
+let ME = null;
+const role = () => ME ? ME.permissions.role : null;
+const isCentral = () => role() === "CENTRAL_COMMAND";
+
+// Bottom navigation per role.  The server's permissions decide the DATA;
+// this decides which screens each department's phone shows.
+const TABS = {
+  CENTRAL_COMMAND:      [["home","Command",I.home],["map","Map",I.map],["events","Events",I.list],["alerts","Alerts",I.bell],["me","Me",I.user]],
+  TRAFFIC_DEPARTMENT:   [["home","Traffic",I.home],["map","Map",I.map],["events","Tasks",I.list],["alerts","Alerts",I.bell],["me","Me",I.user]],
+  ROADS_INFRASTRUCTURE: [["home","Roads",I.home],["nearby","Nearby",I.target],["events","Issues",I.list],["alerts","Alerts",I.bell],["me","Me",I.user]],
+  PUBLIC_SAFETY:        [["home","Safety",I.home],["map","Map",I.map],["events","Cases",I.list],["alerts","Alerts",I.bell],["me","Me",I.user]],
+  TRANSPORT_AUTHORITY:  [["home","Fleet",I.bus],["routes","Routes",I.route],["map","Map",I.map],["alerts","Alerts",I.bell],["me","Me",I.user]],
+  FIELD_OFFICER:        [["home","Tasks",I.check],["nearby","Nearby",I.target],["events","Events",I.list],["alerts","Alerts",I.bell],["me","Me",I.user]],
+};
+const EXTRA_SCREENS = {TRANSPORT_AUTHORITY:["bus"], CENTRAL_COMMAND:["bus","routes","nearby"]};
+const allowedScreen = s => s === "event" || (TABS[role()] || []).some(t => t[0] === s) || (EXTRA_SCREENS[role()] || []).includes(s);
+const CAT_LABEL = {ROADS_INFRASTRUCTURE:"ROAD ISSUE", TRAFFIC_DEPARTMENT:"TRAFFIC ISSUE", PUBLIC_SAFETY:"SAFETY INCIDENT", TRANSPORT_AUTHORITY:"TRANSPORT ISSUE"};
+
+function showLogin(msg=""){
+  ME = null; stopSync(); closeSheet(); closeViewer();
+  $("#topbar").hidden = true; $("#bottomnav").hidden = true; $("#main").innerHTML = "";
+  $("#login").classList.add("show");
+  const m = $("#loginMsg"); m.className = ""; m.textContent = msg;
+}
+
+$("#loginForm").onsubmit = async ev => {
+  ev.preventDefault();
+  const btn = $("#loginBtn"), m = $("#loginMsg");
+  btn.disabled = true; m.className = ""; m.textContent = "Signing in…";
+  try{
+    const res = await fetch("/auth/login", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({login:$("#lu").value.trim(), password:$("#lp").value, client:"mobile"})});
+    const j = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error(errText(j, `Login failed (${res.status})`));
+    ME = {user:j.user, permissions:j.permissions};
+    $("#lp").value = ""; m.textContent = "";
+    $("#login").classList.remove("show");
+    history.replaceState(null, "", "#/home");          // the role's own dashboard
+    boot();
+    toast(`Signed in · ${j.user.role_label}`, "ok");
+  }catch(e){ m.className = "err"; m.textContent = e.message; }
+  finally{ btn.disabled = false; }
+};
+$("#forgot").onclick = async ev => {
+  ev.preventDefault();
+  const login = $("#lu").value.trim(), m = $("#loginMsg");
+  if(!login){ m.className = "err"; m.textContent = "Enter your email or username first."; return; }
+  try{
+    const res = await fetch("/auth/forgot-password", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({login})});
+    const j = await res.json().catch(() => ({}));
+    m.className = res.ok ? "" : "err"; m.textContent = res.ok ? j.message : errText(j, "Could not send the request");
+  }catch(e){ m.className = "err"; m.textContent = e.message; }
+};
+
+function boot(){
+  document.documentElement.style.setProperty("--dept", DEPT_COLOR[role()] || "#2F6FED");
+  $("#topbar").hidden = false; $("#bottomnav").hidden = false;
+  $("#backBtn").innerHTML = I.back; $("#refreshBtn").innerHTML = I.refresh;
+  buildNav(); route(); startSync();
+}
+
+function subLabel(){
+  const p = ME.permissions;
+  if(p.role === "CENTRAL_COMMAND") return "Central Command";
+  if(p.role === "FIELD_OFFICER") return `Field Officer · ${DEPT_NAME[p.department] || ""}`;
+  return p.department_label;
+}
+
+/* ==================================================================
+   4. router
+   ================================================================== */
+let unread = 0;
+function buildNav(){
+  const cur = parseHash().screen;
+  $("#bottomnav").innerHTML = (TABS[role()] || []).map(([id, label, icon]) =>
+    `<a href="#/${id}" class="${cur === id ? "on" : ""}" data-tab="${id}">${icon}<span>${esc(label)}</span>${
+      id === "alerts" && unread ? `<span class="nbadge">${unread > 99 ? "99+" : unread}</span>` : ""}</a>`).join("");
+}
+function parseHash(){
+  const parts = (location.hash || "#/home").replace(/^#\/?/, "").split("/");
+  return {screen: parts[0] || "home", arg: parts[1] ? decodeURIComponent(parts[1]) : null};
+}
+let renderSeq = 0;
+async function route({quiet=false}={}){
+  if(!ME) return;
+  let {screen, arg} = parseHash();
+  if(!screens[screen] || !allowedScreen(screen)){
+    if(screens[screen]) toast("That screen belongs to another department", "err");
+    screen = "home"; arg = null; history.replaceState(null, "", "#/home");
+  }
+  const tab = (TABS[role()] || []).find(t => t[0] === screen);
+  const detail = !tab;
+  $("#backBtn").hidden = !detail;
+  $("#topSub").textContent = subLabel();
+  $("#topTitle").textContent = tab ? tab[1] : (screen === "event" ? (arg || "Event") : screen === "bus" ? (arg || "Bus") : title(screen));
+  buildNav();
+  const main = $("#main"), seq = ++renderSeq, y = window.scrollY;
+  if(!quiet){ main.innerHTML = skel(5); window.scrollTo(0, 0); }
+  try{
+    const html = await screens[screen](arg);
+    if(seq !== renderSeq || !ME) return;
+    main.innerHTML = html;
+    if(screens[screen].after) await screens[screen].after(arg);
+    if(quiet) window.scrollTo(0, y);
+  }catch(e){
+    if(e.status === 401 || seq !== renderSeq) return;
+    main.innerHTML = empty("Could not load this screen", e.message);
+  }
+}
+window.addEventListener("hashchange", () => route());
+$("#backBtn").onclick = () => { if(history.length > 1) history.back(); else location.hash = "#/home"; };
+$("#refreshBtn").onclick = () => { route(); pollSync(); };
+
+// anything with data-case opens that event; data-go navigates
+document.addEventListener("click", e => {
+  const c = e.target.closest("[data-case]");
+  if(c && !e.target.closest("button[data-act]")){ e.preventDefault(); location.hash = `#/event/${encodeURIComponent(c.getAttribute("data-case"))}`; return; }
+  const g = e.target.closest("[data-go]");
+  if(g){ e.preventDefault(); location.hash = g.getAttribute("data-go"); }
+});
+
+/* ==================================================================
+   5. live sync -- the same change token the web dashboard polls
+   ================================================================== */
+let syncTimer = null, syncToken = null;
+function startSync(){ stopSync(); syncTimer = setInterval(pollSync, 10000); pollSync(); }
+function stopSync(){ if(syncTimer) clearInterval(syncTimer); syncTimer = null; syncToken = null; }
+async function pollSync(){
+  if(!ME || document.hidden) return;
+  try{
+    const st = await api("/sync/state");
+    if(st.unread > unread && syncToken !== null) toast("New notification");
+    if(st.unread !== unread){ unread = st.unread; buildNav(); }
+    if(syncToken !== null && st.token !== syncToken){
+      const busy = document.body.classList.contains("sheet-open") || $("#viewer").classList.contains("show");
+      if(!busy) route({quiet:true});
+    }
+    syncToken = st.token;
+  }catch(_){}
+}
+document.addEventListener("visibilitychange", () => { if(!document.hidden) pollSync(); });
+
+/* ==================================================================
+   6. building blocks
+   ================================================================== */
+function eventCard(c, {distance=false}={}){
+  const img = c.thumbnail ? `<img class="th" loading="lazy" src="${esc(c.thumbnail)}" alt="">`
+    : `<div class="th">${c.recording_name ? "video" : "no image"}</div>`;
+  return `<div class="ecard" data-case="${esc(c.case_id)}" style="--sevc:${SEV_COLOR[c.severity] || "#E0E6EE"}">
+    ${img}
+    <div class="x"><b>${esc(c.title)}</b>
+      <div class="m"><span class="id">${esc(c.case_id)}</span> · ${esc(c.bus_id || "–")} · ${esc(ago(c.last_seen))}</div>
+      <div class="row">${pill(c.status)} ${sev(c.severity)}${distance && c.distance_m != null ? ` <span class="dist">${c.distance_m} m</span>` : ""}
+        ${c.assignee_name ? `<span class="muted">· ${esc(c.assignee_name)}</span>` : ""}</div></div>
+    <div class="go">&#8250;</div></div>`;
+}
+const cards = (rows, note="Nothing here right now.", opts={}) => rows.length ? rows.map(c => eventCard(c, opts)).join("") : empty("No events", note);
+const openRows = rows => rows.filter(c => c.status !== "RESOLVED");
+const working = rows => rows.filter(c => c.status === "ASSIGNED" || c.status === "IN_PROGRESS");
+
+/* ---- map (Leaflet, or an SVG plot when the tile/CDN is unreachable) ---- */
+const LAYER_COLOR = {buses:"#188556", potholes:"#D2622A", damaged_roads:"#B4740A", waterlogging:"#1E88E5", traffic:"#2F6FED",
+  incidents:"#D93A3F", anpr:"#7B4FD6", road_assets:"#5E6B7D", persistent_issues:"#8A6212"};
+const LEVEL_COLOR = {LOW:"#188556", MEDIUM:"#B4740A", HIGH:"#D2622A", CRITICAL:"#D93A3F"};
+const LAYER_LABEL = {buses:"Buses", potholes:"Potholes", damaged_roads:"Damaged roads", waterlogging:"Waterlogging", traffic:"Traffic",
+  incidents:"Incidents", anpr:"ANPR", road_assets:"Road assets", persistent_issues:"Persistent"};
+let leafletMaps = {};
+function markersFrom(layers){
+  const out = [];
+  Object.entries(layers || {}).forEach(([kind, rows]) => (rows || []).forEach(r => {
+    if(r.lat == null || r.lon == null) return;
+    const color = r.status === "RESOLVED" ? "#9AA5B5" : (kind === "traffic" && r.level ? LEVEL_COLOR[r.level] : LAYER_COLOR[kind]) || "#5E6B7D";
+    out.push({lat:+r.lat, lon:+r.lon, color, kind, case_id:r.case_id, title:r.title || kind,
+      html:`<b>${esc(r.title || LAYER_LABEL[kind])}</b><br><span style="color:#4F5B6E">${esc(r.subtitle || "")}</span>${
+        r.case_id ? `<br><a href="#/event/${encodeURIComponent(r.case_id)}">Open ${esc(r.case_id)} &rsaquo;</a>` : ""}`});
+  }));
+  return out;
+}
+function drawMap(elId, markers, {me=null, line=null}={}){
+  const el = document.getElementById(elId); if(!el) return;
+  if(leafletMaps[elId]){ try{ leafletMaps[elId].remove(); }catch(_){} delete leafletMaps[elId]; }
+  const pts = [...markers.map(m => [m.lat, m.lon]), ...(line || []), ...(me ? [me] : [])];
+  if(!pts.length){ el.innerHTML = empty("Nothing to show on the map", "Only events with GPS appear here."); return; }
+  if(typeof L === "undefined"){
+    const la = pts.map(p => p[0]), lo = pts.map(p => p[1]);
+    const a = Math.min(...la), b = Math.max(...la), c = Math.min(...lo), d = Math.max(...lo);
+    const W = 400, H = 300, pad = 22;
+    const x = v => pad + (v - c) / ((d - c) || 1) * (W - 2*pad), y = v => H - pad - (v - a) / ((b - a) || 1) * (H - 2*pad);
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="background:#EEF2F7">
+      ${line ? `<polyline fill="none" stroke="#188556" stroke-width="3" opacity=".7" points="${line.map(p => `${x(p[1]).toFixed(1)},${y(p[0]).toFixed(1)}`).join(" ")}"/>` : ""}
+      ${markers.map(m => `<circle cx="${x(m.lon).toFixed(1)}" cy="${y(m.lat).toFixed(1)}" r="9" fill="${m.color}" fill-opacity=".85" stroke="#fff" stroke-width="2"
+        ${m.case_id ? `data-case="${esc(m.case_id)}"` : ""}><title>${esc(m.title)}</title></circle>`).join("")}
+      ${me ? `<circle cx="${x(me[1])}" cy="${y(me[0])}" r="8" fill="#2F6FED" stroke="#fff" stroke-width="3"/>` : ""}
+      <text x="${pad}" y="${H-6}" font-size="10" fill="#8591A4">GPS plot (map tiles unavailable) · tap a dot to open</text></svg>`;
+    return;
+  }
+  el.innerHTML = "";
+  const map = L.map(elId, {zoomControl:false, attributionControl:false}); leafletMaps[elId] = map;
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19}).addTo(map);
+  if(line && line.length > 1) L.polyline(line, {color:"#188556", weight:4, opacity:.7}).addTo(map);
+  markers.forEach(m => L.circleMarker([m.lat, m.lon], {radius:10, color:"#fff", weight:2, fillColor:m.color, fillOpacity:.9}).addTo(map).bindPopup(m.html));
+  if(me) L.circleMarker(me, {radius:9, color:"#fff", weight:3, fillColor:"#2F6FED", fillOpacity:1}).addTo(map).bindPopup("You are here");
+  map.fitBounds(pts, {padding:[30,30], maxZoom:17});
+}
+async function layerMap(elId, layers=null){
+  const q = layers ? `?layers=${layers.join(",") || "none"}` : "";
+  const data = await api(`/map/layers${q}`);
+  drawMap(elId, markersFrom(data.layers));
+  return data;
+}
+
+/* ---- geolocation (needs HTTPS or localhost on phones) ---- */
+function locate(){
+  return new Promise(resolve => {
+    if(!navigator.geolocation || !window.isSecureContext) return resolve(null);
+    navigator.geolocation.getCurrentPosition(p => resolve([p.coords.latitude, p.coords.longitude]),
+      () => resolve(null), {enableHighAccuracy:true, timeout:8000, maximumAge:60000});
+  });
+}
+
+/* ==================================================================
+   7. screens
+   ================================================================== */
+const screens = {};
+const HOME = {};
+screens.home = () => (HOME[role()] || HOME.CENTRAL_COMMAND)();
+screens.home.after = () => { const a = (HOME[role()] || {}).after; return a ? a() : null; };
+
+/* ---- Central Command ---- */
+HOME.CENTRAL_COMMAND = async () => {
+  const [h, sum, recent, fleet, notes] = await Promise.all([api("/health"), api("/cases/summary"),
+    api("/cases?limit=8&sort=recent"), api("/fleet"), api("/notifications?limit=4")]);
+  const incidents = ["collision","possible_collision","hit_and_run","abnormal_movement","pedestrian_vehicle_risk","rash_driving"];
+  const activeIncidents = (await api(`/cases?open_only=true&event_type=${incidents.join(",")}&limit=1`)).total;
+  const depts = Object.entries(sum.by_department || {});
+  return `<div class="kpis">
+      ${kpi("Events", h.events, "raw detections, all modules", "acc")}
+      ${kpi("Critical alerts", sum.critical_open, "open, critical", sum.critical_open ? "crit" : "ok", "#/events")}
+      ${kpi("Active buses", `${fleet.totals.reporting}/${fleet.totals.registered}`, `reporting in last ${fleet.active_window_minutes} min`, "")}
+      ${kpi("Active incidents", activeIncidents, "open safety events", activeIncidents ? "high" : "ok", "#/events")}
+    </div>
+    <h2 class="sec">Department activity <span class="r">${sum.open} open</span></h2>
+    <div class="list">${depts.map(([d, b]) => `<div class="li" data-dept="${esc(d)}">
+        <span style="width:10px;height:10px;border-radius:50%;background:${DEPT_COLOR[d]};flex:none"></span>
+        <b>${esc(DEPT_NAME[d] || d)}</b><span>${b.open} open · ${b.total} total</span></div>`).join("") || empty("No managed events yet")}</div>
+    <h2 class="sec">Recent events <a class="r" href="#/events">All</a></h2>
+    ${cards(recent.items)}
+    <h2 class="sec">Notifications <a class="r" href="#/alerts">All</a></h2>
+    ${notes.items.map(notifRow).join("") || empty("No notifications")}`;
+};
+HOME.CENTRAL_COMMAND.after = () => $$("[data-dept]").forEach(li => li.onclick = () => { EVS.dept = li.dataset.dept; EVS.filter = "open"; location.hash = "#/events"; });
+
+/* ---- Traffic ---- */
+HOME.TRAFFIC_DEPARTMENT = async () => {
+  const [tr, cases, notes] = await Promise.all([api("/traffic?limit=600"), api("/cases?limit=200&sort=recent"), api("/notifications?limit=3")]);
+  const obs = tr.filter(r => r.event_type === "traffic_observation");
+  const cong = tr.filter(r => r.event_type === "traffic_congestion"), bott = tr.filter(r => r.event_type === "traffic_bottleneck");
+  const m = obs[0] ? (obs[0].metadata || {}) : {};
+  const byIssue = {}; [...cong, ...bott].forEach(r => { const k = r.issue_id || r.event_id; byIssue[k] = Math.max(byIssue[k] || 0, +((r.metadata || {}).estimated_delay || 0)); });
+  const delay = Object.values(byIssue).reduce((a, b) => a + b, 0);
+  const mine = cases.items.filter(c => c.owner_department === "TRAFFIC_DEPARTMENT");
+  const incidents = cases.items.filter(c => ["rash_driving","collision","possible_collision"].includes(c.event_type));
+  return `<div class="kpis">
+      ${kpi("Congestion", cong.length, "episodes", cong.length ? "high" : "ok")}
+      ${kpi("Bottlenecks", bott.length, "zone stalls", bott.length ? "high" : "ok")}
+      ${kpi("Vehicles now", m.vehicle_count, `${m.unique_vehicles ?? "–"} unique this run`, "acc")}
+      ${kpi("Density", pct(m.density_percentage), `level ${m.traffic_level || "–"}`, m.traffic_level === "HIGH" || m.traffic_level === "CRITICAL" ? "high" : "ok")}
+    </div>
+    <div class="kpis" style="margin-top:10px;grid-template-columns:1fr">${kpi("Route delay estimate", `${num(delay)} min`, "summed over congestion episodes", delay ? "med" : "")}</div>
+    <h2 class="sec">Traffic alerts <a class="r" href="#/alerts">All</a></h2>
+    ${notes.items.map(notifRow).join("") || empty("No traffic alerts", "Congestion and bottleneck alerts arrive here.")}
+    <h2 class="sec">Assigned tasks</h2>${cards(working(mine), "Nothing assigned or in progress.")}
+    <h2 class="sec">Congestion & bottlenecks</h2>${cards(openRows(mine), "No congestion has been confirmed in the processed footage.")}
+    <h2 class="sec">Traffic incidents</h2>${cards(incidents, "No collision or rash driving in the processed footage.")}
+    <h2 class="sec">Traffic heatmap</h2><div class="map" id="hmap"></div>`;
+};
+HOME.TRAFFIC_DEPARTMENT.after = () => layerMap("hmap");
+
+/* ---- Roads & Infrastructure ---- */
+const ROAD_GROUPS = [
+  ["Potholes", ["pothole"]], ["Damaged roads", ["damaged_road","road_damage_other"]], ["Waterlogging", ["waterlogging"]],
+  ["Missing dividers", ["missing_divider"]], ["Zebra crossings", ["missing_zebra_crossing","damaged_zebra_crossing"]],
+  ["Traffic signs", ["missing_traffic_signboard","damaged_traffic_signboard"]],
+];
+HOME.ROADS_INFRASTRUCTURE = async () => {
+  const [sum, cases, issues] = await Promise.all([api("/cases/summary"), api("/cases?limit=300&sort=priority"), api("/issues?limit=500")]);
+  const oc = sum.open_by_class || {};
+  const persistent = issues.filter(i => !["zebra_crossing","divider","traffic_signboard","road_repair"].includes(i.class_name)
+    && ((i.observation_count || 0) >= 2 || (i.bus_count || 0) >= 2 || (i.reopened_count || 0) > 0));
+  const tiles = ROAD_GROUPS.map(([label, keys]) => {
+    const n = keys.reduce((a, k) => a + (oc[k] || 0), 0);
+    return kpi(label, n, "open", n ? (keys[0] === "pothole" || keys[0] === "damaged_road" ? "high" : "med") : "ok", `#/events/${keys.join(",")}`);
+  }).join("");
+  return `<div class="kpis">${tiles}
+      ${kpi("Persistent", persistent.length, "seen repeatedly", persistent.length ? "med" : "")}
+      ${kpi("Resolved 24 h", sum.resolved_24h, "by your department", "ok")}</div>
+    <h2 class="sec">Nearby road issues <a class="r" href="#/nearby">Map</a></h2>
+    <button class="btn block dark" data-go="#/nearby">${I.target} FIND ISSUES NEAR ME</button>
+    <h2 class="sec">Assigned tasks</h2>${cards(working(cases.items), "Nothing assigned or in progress.")}
+    <h2 class="sec">Open road issues <a class="r" href="#/events">All</a></h2>${cards(openRows(cases.items).slice(0, 12), "No open road issues.")}`;
+};
+
+/* ---- Public Safety ---- */
+HOME.PUBLIC_SAFETY = async () => {
+  const [sum, cases, reads] = await Promise.all([api("/cases/summary"), api("/cases?limit=300"), api("/anpr?limit=20")]);
+  const bt = sum.by_type || {};
+  const mine = cases.items.filter(c => c.owner_department === "PUBLIC_SAFETY");
+  return `<div class="kpis">
+      ${kpi("Hit-and-run", bt.hit_and_run || 0, "events", bt.hit_and_run ? "crit" : "ok", "#/events/hit_and_run")}
+      ${kpi("Collisions", (bt.collision || 0) + (bt.possible_collision || 0), "confirmed + possible", bt.collision ? "high" : "ok", "#/events/collision,possible_collision")}
+      ${kpi("Pedestrian", bt.pedestrian_vehicle_risk || 0, "crossing near traffic", bt.pedestrian_vehicle_risk ? "high" : "ok", "#/events/pedestrian_vehicle_risk")}
+      ${kpi("Abnormal movement", bt.abnormal_movement || 0, "events", bt.abnormal_movement ? "med" : "ok", "#/events/abnormal_movement")}
+    </div>
+    <h2 class="sec">Assigned cases</h2>${cards(working(mine), "Nothing assigned or in progress.")}
+    <h2 class="sec">Open safety incidents <a class="r" href="#/events">All</a></h2>${cards(openRows(mine).slice(0, 12), "No open safety incidents.")}
+    <h2 class="sec">ANPR incident reads</h2>
+    ${reads.length ? `<div class="list">${reads.slice(0, 8).map(r => { const m = r.metadata || {}; return `<div class="li">
+        <span class="plate" style="font-size:15px;padding:3px 8px">${esc(m.registration_number || "UNKNOWN")}</span>
+        <b></b><span>${confPct(r.confidence)} · ${esc(title(m.triggered_by_event_type || ""))}</span></div>`; }).join("")}</div>`
+      : empty("No plate reads", "ANPR runs only when an incident asks for identification.")}`;
+};
+
+/* ---- Transport ---- */
+HOME.TRANSPORT_AUTHORITY = async () => {
+  const f = await api("/fleet"), t = f.totals;
+  return `<div class="kpis">
+      ${kpi("Reporting", `${t.reporting}/${t.registered}`, `in last ${f.active_window_minutes} min`, t.reporting ? "ok" : "")}
+      ${kpi("Idle / none", (t.idle || 0) + (t.no_reports || 0), `${t.no_reports} never reported`)}
+      ${kpi("Trips", t.trips, "one per run per bus", "acc")}
+      ${kpi("Road covered", `${num(t.approx_road_km)} km`, `${t.segments_covered} segments`)}
+    </div>
+    <h2 class="sec">Fleet status</h2>
+    <div class="list">${f.buses.map(b => `<div class="li" data-go="#/bus/${encodeURIComponent(b.bus_id)}">
+        <span style="width:10px;height:10px;border-radius:50%;flex:none;background:${b.state === "REPORTING" ? "#188556" : b.state === "IDLE" ? "#B4740A" : b.state.includes("SERVICE") || b.state === "MAINTENANCE" ? "#D93A3F" : "#8591A4"}"></span>
+        <b>${esc(b.bus_id)} <span class="muted">${esc(b.route_id || "")}</span></b>
+        <span>${esc(title(b.state.toLowerCase()))}<br>${b.cases_open} open · ${esc(ago(b.last_report))}</span></div>`).join("")}</div>
+    <h2 class="sec">Bus locations</h2><div class="map" id="bmap"></div>
+    <div class="stack" style="margin-top:14px"><button class="btn block dark" data-go="#/routes">${I.route} ROUTE PERFORMANCE & DELAYS</button></div>`;
+};
+HOME.TRANSPORT_AUTHORITY.after = () => layerMap("bmap", ["buses","traffic"]);
+
+/* ---- Field Officer ---- */
+HOME.FIELD_OFFICER = async () => {
+  const [sum, mine, pool] = await Promise.all([api("/cases/summary"), api("/cases?assigned=me&limit=100&sort=status"),
+    api("/cases?open_only=true&assigned=unassigned&limit=50")]);
+  const myOpen = openRows(mine.items);
+  const crit = pool.items.filter(c => c.severity === "CRITICAL" || c.priority_band === "CRITICAL");
+  return `<div class="kpis">
+      ${kpi("My tasks", myOpen.length, "open, assigned to me", myOpen.length ? "acc" : "ok")}
+      ${kpi("In progress", mine.items.filter(c => c.status === "IN_PROGRESS").length, "work started", "")}
+      ${kpi("Unassigned", pool.total, "in my department", pool.total ? "med" : "")}
+      ${kpi("Priority alerts", sum.critical_open, "critical open", sum.critical_open ? "crit" : "ok")}
+    </div>
+    <h2 class="sec">Assigned to me</h2>
+    ${myOpen.length ? myOpen.map(c => eventCard(c) + "").join("") : empty("No tasks assigned to you", "Pick one up below or wait for an assignment.")}
+    <button class="btn block dark" data-go="#/nearby" style="margin-top:6px">${I.target} NEARBY INCIDENTS</button>
+    <h2 class="sec">Priority alerts</h2>${cards(crit.slice(0, 6), "No critical unassigned events.")}
+    <h2 class="sec">Unassigned in my department</h2>${cards(pool.items.slice(0, 10), "Everything open is assigned.")}`;
+};
+
+/* ---- events list ---- */
+const EVS = {filter:"open", dept:"ALL"};
+screens.events = async arg => {
+  const q = new URLSearchParams({limit:"200"});
+  if(EVS.filter === "open") q.set("open_only", "true");
+  if(EVS.filter === "mine") q.set("assigned", "me");
+  if(EVS.filter === "unassigned"){ q.set("assigned", "unassigned"); q.set("open_only", "true"); }
+  if(EVS.filter === "resolved") q.set("status", "RESOLVED");
+  if(isCentral() && EVS.dept !== "ALL") q.set("department", EVS.dept);
+  if(arg){ const road = ROAD_GROUPS.some(([, keys]) => keys.includes(arg.split(",")[0])); q.set(road ? "class_name" : "event_type", arg); }
+  const data = await api(`/cases?${q}`);
+  const chips = [["open","Open"],["mine","Mine"],["unassigned","Unassigned"],["resolved","Resolved"],["all","All"]]
+    .map(([v, l]) => `<button class="chip ${EVS.filter === v ? "on" : ""}" data-f="${v}">${l}</button>`).join("");
+  const dchips = isCentral() ? `<div class="chips" style="margin-top:4px">${[["ALL","All depts"],["ROADS_INFRASTRUCTURE","Roads"],["TRAFFIC_DEPARTMENT","Traffic"],
+      ["PUBLIC_SAFETY","Safety"],["TRANSPORT_AUTHORITY","Transport"]].map(([v, l]) => `<button class="chip ${EVS.dept === v ? "on" : ""}" data-d="${v}">${l}</button>`).join("")}</div>` : "";
+  return `<div class="chips">${chips}</div>${dchips}
+    ${arg ? `<div class="muted" style="margin:6px 2px 10px">Filtered to <b>${esc(arg.split(",").map(title).join(", "))}</b> · <a href="#/events">clear</a></div>` : ""}
+    <div class="muted" style="margin:6px 2px 10px">${data.total} event${data.total === 1 ? "" : "s"}</div>
+    ${cards(data.items, "No events match this filter.")}`;
+};
+screens.events.after = () => {
+  $$("[data-f]").forEach(b => b.onclick = () => { EVS.filter = b.dataset.f; route({quiet:true}); });
+  $$("[data-d]").forEach(b => b.onclick = () => { EVS.dept = b.dataset.d; route({quiet:true}); });
+};
+
+/* ---- nearby: map + distance-sorted list ---- */
+let nearbyPos = null;
+screens.nearby = async () => {
+  nearbyPos = await locate();
+  const q = nearbyPos ? `near=${nearbyPos[0]},${nearbyPos[1]}&sort=distance` : "sort=priority";
+  const data = await api(`/cases?open_only=true&limit=40&${q}`);
+  screens.nearby._rows = data.items;
+  return `<div class="map" id="nmap"></div>
+    <div class="muted" style="margin:10px 2px">${nearbyPos ? `Sorted by distance from you (${nearbyPos[0].toFixed(4)}, ${nearbyPos[1].toFixed(4)}).`
+      : window.isSecureContext ? "Location permission was not granted, so events are sorted by priority."
+      : "Location needs HTTPS on a phone, so events are sorted by priority. See the README for HTTPS."}</div>
+    ${cards(data.items, "No open events in your department.", {distance:true})}`;
+};
+screens.nearby.after = () => {
+  const rows = screens.nearby._rows || [];
+  drawMap("nmap", rows.filter(c => c.latitude != null).map(c => ({lat:c.latitude, lon:c.longitude, case_id:c.case_id, kind:"case",
+    color:SEV_COLOR[c.severity] || "#5E6B7D", title:`${c.case_id} ${c.title}`,
+    html:`<b>${esc(c.title)}</b><br>${esc(c.case_id)} · ${esc(STATUS_LABEL[c.status])}${c.distance_m != null ? ` · ${c.distance_m} m` : ""}<br><a href="#/event/${encodeURIComponent(c.case_id)}">Open &rsaquo;</a>`})),
+    {me:nearbyPos});
+};
+
+/* ---- map ---- */
+let mapLayers = null;
+screens.map = async () => {
+  const p = ME.permissions;
+  if(!mapLayers) mapLayers = [...p.default_layers];
+  const data = await api(`/map/layers?layers=${mapLayers.join(",") || "none"}`);
+  screens.map._markers = markersFrom(data.layers);
+  const count = k => (data.layers[k] || []).length;
+  return `<div class="chips">${p.map_layers.map(k => `<button class="chip ${mapLayers.includes(k) ? "on" : ""}" data-layer="${k}">
+      <i style="width:9px;height:9px;border-radius:50%;background:${mapLayers.includes(k) ? "#fff" : LAYER_COLOR[k]};display:inline-block"></i>${esc(LAYER_LABEL[k])}${
+      mapLayers.includes(k) ? ` <span class="c">${count(k)}</span>` : ""}</button>`).join("")}</div>
+    <div class="map tall" id="fmap" style="margin-top:6px"></div>
+    <div class="legend">${mapLayers.map(k => `<span><i style="background:${LAYER_COLOR[k]}"></i>${esc(LAYER_LABEL[k])}</span>`).join("")}<span><i style="background:#9AA5B5"></i>Resolved</span></div>`;
+};
+screens.map.after = () => {
+  $$("[data-layer]").forEach(b => b.onclick = () => {
+    const k = b.dataset.layer; mapLayers = mapLayers.includes(k) ? mapLayers.filter(x => x !== k) : [...mapLayers, k]; route({quiet:true});
+  });
+  drawMap("fmap", screens.map._markers || []);
+};
+
+/* ---- alerts ---- */
+function notifRow(n){
+  return `<div class="notif ${n.read ? "" : "unread"}" data-nid="${n.id}" ${n.case_id ? `data-ncase="${esc(n.case_id)}"` : ""}>
+    <div class="bar ${esc(n.severity || "INFO")}"></div>
+    <div style="flex:1;min-width:0"><b>${n.read ? "" : `<span class="dotu"></span>`}${esc(n.title)}</b><span>${esc(n.body || "")}</span>
+      <div class="when">${esc(stamp(n.created_at))}${n.case_id ? ` · ${esc(n.case_id)}` : ""}</div></div></div>`;
+}
+screens.alerts = async () => {
+  const data = await api("/notifications?limit=100");
+  unread = data.unread; buildNav();
+  return `<div style="display:flex;align-items:center;margin-bottom:10px"><span class="muted" style="flex:1">${data.unread} unread</span>
+      <button class="chip" id="readAll" ${data.unread ? "" : "disabled"}>Mark all read</button></div>
+    ${data.items.map(notifRow).join("") || empty("No notifications", "Events for your department and tasks assigned to you arrive here.")}`;
+};
+screens.alerts.after = () => {
+  const all = $("#readAll");
+  if(all) all.onclick = async () => { const r = await post("/notifications/read", {ids:null}); unread = r.unread; route({quiet:true}); };
+  bindNotifs();
+};
+function bindNotifs(){
+  $$("[data-nid]").forEach(el => el.onclick = async () => {
+    try{ const r = await post("/notifications/read", {ids:[+el.dataset.nid]}); unread = r.unread; buildNav(); }catch(_){}
+    if(el.dataset.ncase) location.hash = `#/event/${encodeURIComponent(el.dataset.ncase)}`;
+    else route({quiet:true});
+  });
+}
+const _homeAfter = screens.home.after;
+screens.home.after = async () => { await _homeAfter(); bindNotifs(); };
+
+/* ---- me ---- */
+screens.me = async () => {
+  const u = ME.user;
+  return `<div class="card profile"><div class="av">${esc(initials(u.name))}</div>
+      <div style="font-size:19px;font-weight:800">${esc(u.name)}</div>
+      <div class="muted">${esc(u.email)}</div>
+      <div style="margin-top:8px"><span class="pill" style="background:${DEPT_COLOR[u.role]}22;color:${DEPT_COLOR[u.role]}">${esc(u.role_label.toUpperCase())}</span></div>
+      <div class="muted" style="margin-top:6px">${esc(u.department_label)}</div></div>
+    <div class="stack" style="margin-top:14px">
+      <button class="btn block" id="pwBtn">Change password</button>
+      <a class="btn block" href="/">Open web dashboard</a>
+      <button class="btn block warn" id="logoutBtn">Log out</button>
+    </div>
+    <div class="muted" style="text-align:center;margin-top:18px">Same account, same data as the web dashboard.<br>
+      Add this app to your home screen from the browser menu.</div>`;
+};
+screens.me.after = () => {
+  $("#logoutBtn").onclick = async () => { try{ await fetch("/auth/logout", {method:"POST", credentials:"same-origin"}); }catch(_){} showLogin("You have been logged out."); };
+  $("#pwBtn").onclick = () => openSheet(`<h3>Change password</h3>
+      <div class="stack"><input class="in" type="password" id="pc" placeholder="Current password" autocomplete="current-password">
+      <input class="in" type="password" id="pn" placeholder="New password (8+ characters)" autocomplete="new-password">
+      <input class="in" type="password" id="pr" placeholder="Repeat new password" autocomplete="new-password">
+      <button class="btn block primary" id="pOk">CHANGE PASSWORD</button><div class="muted" id="pMsg"></div></div>`, () => {
+    $("#pOk").onclick = async () => {
+      if($("#pn").value !== $("#pr").value){ $("#pMsg").textContent = "The new passwords do not match."; return; }
+      try{ await post("/auth/change-password", {current_password:$("#pc").value, new_password:$("#pn").value});
+           closeSheet(); showLogin("Password changed. Log in with the new password."); }
+      catch(e){ $("#pMsg").textContent = e.message; }
+    };
+  });
+};
+
+/* ---- transport: routes + bus ---- */
+screens.routes = async () => {
+  const [routes, od] = await Promise.all([api("/fleet/routes"), api("/fleet/od")]);
+  const impact = routes.flatMap(r => (r.impact || []).map(i => ({...i, route_id:r.route_id})));
+  return routes.map(r => `<div class="card" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px"><b style="font-size:16px">${esc(r.route_id)}</b><span class="muted">${esc(r.name || "")}</span></div>
+      <div class="kpis" style="margin-top:10px">
+        ${kpi("Delay", `${num(r.delay_minutes)} min`, "congestion estimate", r.delay_minutes ? "med" : "ok")}
+        ${kpi("Congested", r.congested_share != null ? pct(r.congested_share * 100) : "–", "of traffic samples")}
+        ${kpi("Avg vehicles", r.avg_vehicles, `density ${pct(r.avg_density_pct)}`)}
+        ${kpi("Incidents", r.incidents, `${r.road_defects} road defects`, r.incidents ? "high" : "")}
+      </div><div class="muted" style="margin-top:8px">Buses: ${esc((r.buses || []).join(", ") || "none")} · ${r.segments} segments</div></div>`).join("")
+    + `<h2 class="sec">Traffic impact on routes</h2>${impact.length ? impact.map(i => `<div class="ecard" data-case="${esc(i.case_id)}"><div class="x"><b>${esc(i.title)}</b>
+        <div class="m">${esc(i.route_id)} · <span class="id">${esc(i.case_id)}</span> · ${esc(i.road_segment || "")}</div><div class="row">${pill(i.status)} ${sev(i.severity)}</div></div><div class="go">&#8250;</div></div>`).join("")
+      : empty("No congestion or incident on route segments")}
+    <h2 class="sec">Origin / destination</h2>
+    <div class="list">${od.map(o => `<div class="li"><b class="mono" style="font-size:12px;font-family:var(--mono)">${esc(o.origin_segment || "–")}<br>&rarr; ${esc(o.destination_segment || "–")}</b>
+      <span>${o.trips} trip(s)<br>${(o.distance_m / 1000).toFixed(2)} km</span></div>`).join("") || empty("No trips yet")}</div>`;
+};
+screens.bus = async id => {
+  const b = await api(`/fleet/${encodeURIComponent(id)}`);
+  screens.bus._b = b;
+  return `<div class="kpis">
+      ${kpi("State", title(b.state.toLowerCase()), `last report ${ago(b.last_report)}`, b.state === "REPORTING" ? "ok" : "")}
+      ${kpi("Open events", b.cases_open, `${b.cases_total} total`, b.cases_open ? "high" : "")}
+      ${kpi("Trips", b.trips, `${(b.distance_m / 1000).toFixed(2)} km`)}
+      ${kpi("Segments", b.segments_covered, "covered")}
+    </div>
+    <h2 class="sec">Trail</h2><div class="map" id="busmap"></div>
+    <h2 class="sec">Events on this bus</h2>
+    ${(b.cases || []).length ? b.cases.map(c => `<div class="ecard" data-case="${esc(c.case_id)}"><div class="x"><b>${esc(c.title)}</b>
+      <div class="m"><span class="id">${esc(c.case_id)}</span> · ${esc(ago(c.last_seen))}</div><div class="row">${pill(c.status)} ${sev(c.severity)}</div></div><div class="go">&#8250;</div></div>`).join("")
+      : empty("No events visible to you")}`;
+};
+screens.bus.after = () => {
+  const b = screens.bus._b; if(!b) return;
+  const trail = (b.trail || []).map(p => [+p.latitude, +p.longitude]);
+  const m = b.last_position ? [{lat:+b.last_position.latitude, lon:+b.last_position.longitude, color:"#188556", kind:"bus", title:b.bus_id, html:`<b>${esc(b.bus_id)}</b>`}] : [];
+  drawMap("busmap", m, {line:trail});
+};
+
+/* ==================================================================
+   8. EVENT DETAIL -- the field workflow
+   ================================================================== */
+let current = null;
+screens.event = async id => {
+  const d = await api(`/cases/${encodeURIComponent(id)}`);
+  current = d;
+  return eventHtml(d);
+};
+function eventHtml(d){
+  const ev = d.evidence || {}, v = ev.video;
+  const idx = STATUSES.indexOf(d.status);
+  const acts = d.allowed_actions || [];
+  const btn = a => {
+    const cls = a.enabled ? (a.action === "resolve" ? "good" : "primary") : "";
+    return `<button class="btn ${cls}" data-act="${a.action}" ${a.enabled ? "" : "disabled"}>${a.done && !a.reassign ? "&#10003; " : ""}${esc((a.reassign ? "Reassign" : a.label).toUpperCase())}</button>`;
+  };
+  const blocked = acts.find(a => a.reason);
+  const why = d.can_act ? "" : `<div class="muted" style="margin-top:10px;text-align:center">${esc(d.status === "RESOLVED"
+    ? "Resolved. It re-opens automatically if a bus detects it again."
+    : blocked ? blocked.reason : `View only: ${d.owner_department_label} acts on this event.`)}</div>`;
+  return `<div class="card">
+      <div class="cat" style="color:${DEPT_COLOR[d.owner_department] || "#8591A4"}">${esc(CAT_LABEL[d.owner_department] || (d.category || "EVENT").toUpperCase())}</div>
+      <div class="etitle">${esc(d.title)}</div>
+      <dl class="facts" style="margin-top:14px">
+        <dt>Event ID</dt><dd class="mono">${esc(d.case_id)}</dd>
+        <dt>Type</dt><dd>${esc((d.event_type === "road_defect" ? (d.class_name || "road defect") : d.event_type).replace(/_/g, " ").toUpperCase())}</dd>
+        <dt>Location</dt><dd class="mono">${d.latitude != null ? `${(+d.latitude).toFixed(5)}, ${(+d.longitude).toFixed(5)}` : "–"}${d.road_segment ? `<br>${esc(d.road_segment)}` : ""}</dd>
+        <dt>Bus</dt><dd class="mono">${esc(ev.bus_id || d.bus_id || "–")}${d.bus_count > 1 ? ` +${d.bus_count - 1}` : ""}</dd>
+        <dt>Camera</dt><dd class="mono">${esc(ev.camera_id || d.camera_id || "–")}</dd>
+        <dt>Confidence</dt><dd>${confPct(ev.confidence ?? d.confidence)} ${sev(d.severity)}</dd>
+        <dt>Detected</dt><dd class="mono">${esc(stamp(ev.timestamp || d.first_seen))}</dd>
+        <dt>Sightings</dt><dd>${d.observation_count} by ${esc((d.buses || []).join(", ") || "–")}</dd>
+        <dt>Assignee</dt><dd>${esc(d.assignee_name || "unassigned")}</dd>
+        ${d.resolution_note ? `<dt>Resolution</dt><dd><i>${esc(d.resolution_note)}</i></dd>` : ""}
+      </dl></div>
+
+    <h2 class="sec">Evidence</h2>
+    ${ev.available ? `
+      ${v ? `<div class="preview" data-view="frame"><img src="${esc(ev.frame_url)}" alt="annotated detection frame"><span>frame ${v.frame_index} · tap to enlarge</span></div>`
+          : ev.detection_image ? `<div class="preview" data-view="crop"><img src="${esc(ev.detection_image)}" alt="detection crop" style="max-height:180px"><span>detection crop</span></div>` : ""}
+      <div class="stack">
+        <button class="btn block" data-view="frame" ${v ? "" : "disabled"}>${I.image} VIEW DETECTION FRAME</button>
+        <button class="btn block" data-view="video" ${v ? "" : "disabled"}>${I.play} PLAY EVIDENCE VIDEO</button>
+        ${ev.detection_image ? `<button class="btn block" data-view="crop">DETECTION CROP</button>` : ""}
+      </div>
+      ${v ? "" : `<div class="muted" style="margin-top:8px">No annotated recording is linked to this event, so only the stored crop is available.</div>`}
+      ${ev.plate ? `<div style="margin-top:12px"><div class="muted">Registration (ANPR)</div><span class="plate">${esc(ev.plate.registration_number)}</span>
+        <span class="muted">${confPct(ev.plate.confidence)}</span></div>` : ""}`
+      : empty("No evidence stored for this event")}
+
+    <h2 class="sec">Status</h2>
+    <div class="card">
+      <div class="bigstatus st-${esc(d.status)}">${esc(d.status.replace("_", " "))}</div>
+      <div class="steps">${STATUSES.map((s, k) => `<i class="${k < idx || d.status === "RESOLVED" ? "on" : k === idx ? "cur" : ""}"></i>`).join("")}</div>
+      <div class="stepl">${STATUSES.map(s => `<span>${esc(STATUS_LABEL[s])}</span>`).join("")}</div>
+      <div class="actgrid">${acts.map(btn).join("")}</div>${why}
+    </div>
+
+    <h2 class="sec">Activity</h2>
+    <div class="card"><div class="timeline">${(d.activity || []).map(a => `<div class="tl ${esc(a.action)}">
+        <div class="when">${esc(stamp(a.at))} · ${esc(a.action.replace("_", " "))}</div><div class="what">${esc(a.note || "")}</div></div>`).join("") || empty("No activity yet")}</div></div>`;
+}
+screens.event.after = () => {
+  const d = current; if(!d) return;
+  $$("[data-view]").forEach(b => b.onclick = () => openViewer(d, b.dataset.view));
+  $$("[data-act]").forEach(b => b.onclick = () => act(d, b.dataset.act));
+};
+
+// seek to the middle of the event frame (see the web dashboard for why)
+const frameTime = v => (v.frame_index != null && v.fps) ? (v.frame_index + 0.5) / v.fps : v.event_time_s;
+function openViewer(d, kind){
+  const ev = d.evidence || {}, v = ev.video;
+  $("#vTitle").textContent = `${d.case_id} · ${kind === "video" ? "Evidence video" : kind === "crop" ? "Detection crop" : "Detection frame"}`;
+  if(kind === "video" && v){
+    $("#vMain").innerHTML = `<video id="vv" controls playsinline preload="metadata" src="${esc(v.url)}"></video>`;
+    $("#vCap").innerHTML = `Annotated recording ${esc(v.name)}. Opens at ${vtime(v.start_s)}; the event is at ${vtime(v.event_time_s)} (frame ${v.frame_index}).
+      Boxes were drawn by the pipeline at inference time.<br><button class="btn block" id="vJump">JUMP TO EVENT FRAME</button>`;
+    const vv = $("#vv");
+    vv.addEventListener("loadedmetadata", () => { vv.currentTime = Math.max(0, v.start_s); }, {once:true});
+    $("#vJump").onclick = () => { vv.pause(); vv.currentTime = frameTime(v); };
+  }else if(kind === "crop"){
+    $("#vMain").innerHTML = `<img src="${esc(ev.detection_image)}" alt="detection crop">`;
+    $("#vCap").textContent = "Crop saved by the module when it raised the event.";
+  }else{
+    $("#vMain").innerHTML = `<img src="${esc(ev.frame_url)}" alt="annotated detection frame">`;
+    $("#vCap").textContent = v ? `Frame ${v.frame_index} of ${v.name} at ${vtime(v.event_time_s)}, exactly as the pipeline annotated it. Pinch to zoom.` : "";
+  }
+  $("#viewer").classList.add("show");
+}
+function closeViewer(){ const vv = $("#vv"); if(vv) vv.pause(); $("#viewer").classList.remove("show"); $("#vMain").innerHTML = ""; }
+$("#vClose").onclick = closeViewer;
+
+let sheetDone = null;
+function openSheet(html, wire){ $("#sheetBody").innerHTML = html; document.body.classList.add("sheet-open"); if(wire) wire(); }
+function closeSheet(){ document.body.classList.remove("sheet-open"); }
+$("#sheetMask").onclick = closeSheet;
+
+async function act(d, action){
+  if(action === "verify" || action === "start") return transition(d, action);
+  if(action === "assign"){
+    openSheet(`<h3>Assign ${esc(d.case_id)}</h3>${skel(2)}`);
+    try{
+      const people = await api(`/cases/${encodeURIComponent(d.case_id)}/assignees`);
+      let pick = (people.find(p => p.role === "FIELD_OFFICER") || people[0] || {}).user_id;
+      $("#sheetBody").innerHTML = `<h3>Assign ${esc(d.case_id)}</h3>
+        ${people.map(p => `<div class="opt ${p.user_id === pick ? "on" : ""}" data-uid="${esc(p.user_id)}"><div class="av">${esc(initials(p.name))}</div>
+          <div style="flex:1"><b>${esc(p.name)}</b><span>${esc(p.role_label)} · ${p.open_tasks} open task(s)</span></div></div>`).join("") || empty("Nobody available")}
+        <input class="in" id="aNote" placeholder="Note (optional)" style="margin:6px 0 12px">
+        <button class="btn block primary" id="aOk" ${people.length ? "" : "disabled"}>CONFIRM ASSIGNMENT</button>`;
+      $$(".opt").forEach(o => o.onclick = () => { pick = o.dataset.uid; $$(".opt").forEach(x => x.classList.toggle("on", x === o)); });
+      $("#aOk").onclick = () => transition(d, "assign", {assignee_user_id:pick, note:$("#aNote").value});
+    }catch(e){ $("#sheetBody").innerHTML = empty("Could not load people", e.message); }
+  }else if(action === "resolve"){
+    openSheet(`<h3>Mark ${esc(d.case_id)} resolved</h3>
+      <textarea class="in" id="rNote" placeholder="What was done? (optional)"></textarea>
+      <button class="btn block good" id="rOk" style="margin-top:12px">CONFIRM RESOLVED</button>`, () => {
+      $("#rOk").onclick = () => transition(d, "resolve", {note:$("#rNote").value});
+    });
+  }
+}
+async function transition(d, action, extra={}){
+  $$("[data-act], #aOk, #rOk").forEach(b => b.disabled = true);
+  try{
+    const out = await post(`/cases/${encodeURIComponent(d.case_id)}/transition`, {action, expected_status:d.status, ...extra});
+    closeSheet();
+    current = out;
+    $("#main").innerHTML = eventHtml(out);
+    screens.event.after();
+    toast(`${out.case_id} → ${STATUS_LABEL[out.status].toUpperCase()}`, "ok");
+    pollSync();
+  }catch(e){
+    closeSheet();
+    toast(e.message, "err");
+    route({quiet:true});
+  }
+}
+
+/* ==================================================================
+   9. start
+   ================================================================== */
+(async function start(){
+  if("serviceWorker" in navigator && window.isSecureContext){
+    navigator.serviceWorker.register("/mobile/sw.js", {scope:"/mobile/"}).catch(() => {});
+  }
+  try{
+    const res = await fetch("/auth/me", {credentials:"same-origin", cache:"no-store"});
+    if(res.status === 401){ showLogin(); return; }
+    if(!res.ok) throw new Error(`${res.status}`);
+    ME = await res.json();
+    boot();
+  }catch(e){
+    $("#login").classList.add("show");
+    $("#loginMsg").className = "err";
+    $("#loginMsg").textContent = "Cannot reach the server. Check your connection and reload.";
+  }
+})();
+</script>
+</body>
+</html>
